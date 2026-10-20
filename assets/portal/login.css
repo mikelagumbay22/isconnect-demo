@@ -1,0 +1,42 @@
+@font-face{font-family:"Fraunces";src:url("../fonts/fraunces-var-latin.woff2?v=20261020a") format("woff2");font-weight:300 700;font-display:optional}
+@font-face{font-family:"Jakarta";src:url("../fonts/jakarta-var-latin.woff2?v=20261020a") format("woff2");font-weight:300 800;font-display:optional}
+*{box-sizing:border-box}html,body{margin:0}
+body.login-page{font-family:Jakarta,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#0b1626;background:#faf7f1;-webkit-font-smoothing:antialiased}
+a{color:#2a609b}a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #4482c1;outline-offset:2px}
+.login-shell{min-height:100vh;display:grid;grid-template-columns:1fr}
+.login-art{display:none}
+.login-main{width:100%;max-width:520px;margin:0 auto;padding:40px 22px 32px}
+.login-logo img{display:block;width:180px;height:auto}
+h1{font-family:Fraunces,Georgia,serif;font-weight:500;font-size:clamp(2rem,5vw,2.6rem);letter-spacing:-.01em;margin:28px 0 6px}
+.login-lead{margin:0 0 20px;color:#475569}
+.cred-card{background:#fff;border:1px solid #e7e1d6;border-radius:18px;padding:18px;box-shadow:0 10px 30px -18px rgba(11,22,38,.35)}
+.cred-card h2{margin:0 0 10px;font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:#2a609b}
+.cred-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.cred-role{display:block;font-size:.78rem;font-weight:700;color:#64748b;margin:0 0 2px}
+.cred-fill{all:unset;box-sizing:border-box;display:block;width:100%;cursor:pointer;padding:9px 12px;border-radius:10px;background:#f6f3ec;border:1px solid transparent;font-size:.86rem;overflow-wrap:anywhere;transition:border-color .2s,background .2s,transform .2s}
+.cred-fill:hover{border-color:#4482c1;background:#eef4fb}.cred-fill:active{transform:scale(.99)}
+.cred-fill:focus-visible{outline:2px solid #4482c1;outline-offset:2px}
+.cred-fill code{font:600 .84rem/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:#0b1626}
+.cred-hint{margin:10px 0 0;font-size:.8rem;color:#64748b}
+.login-form{margin-top:20px;display:grid;gap:6px}
+.login-form label{font-weight:700;font-size:.9rem;margin-top:8px}
+.login-form input{font:inherit;font-size:1rem;padding:13px 14px;border:1px solid #d6cfc1;border-radius:12px;background:#fff;min-height:48px;transition:border-color .2s,box-shadow .2s}
+.login-form input:focus{border-color:#4482c1;box-shadow:0 0 0 4px rgba(68,130,193,.18);outline:none}
+.login-error{min-height:1.4em;margin:6px 0 0;color:#c20000;font-weight:600;font-size:.9rem}
+.login-submit{margin-top:6px;font:700 1rem/1 Jakarta,system-ui,sans-serif;color:#fff;background:#0b1626;border:0;border-radius:999px;padding:16px 22px;min-height:52px;cursor:pointer;transition:background .2s,transform .2s,box-shadow .2s}
+.login-submit:hover{background:#2a609b;box-shadow:0 12px 24px -12px rgba(42,96,155,.8)}.login-submit:active{transform:translateY(1px)}
+.login-back{margin:22px 0 0}
+.login-foot{margin-top:36px;padding-top:18px;border-top:1px solid #e7e1d6;font-size:.82rem;color:#64748b}.login-foot p{margin:4px 0}
+@media(min-width:960px){
+ .login-shell{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr)}
+ .login-art{display:flex;flex-direction:column;justify-content:center;gap:36px;position:sticky;top:0;height:100vh;padding:56px clamp(40px,5vw,80px);overflow:hidden;color:#fff;background:radial-gradient(120% 80% at 0% 0%,#1d3a63 0%,#0b1626 55%,#08101c 100%)}
+ .login-art::before{content:"";position:absolute;width:520px;height:520px;right:-180px;top:-160px;border-radius:50%;background:radial-gradient(circle,rgba(68,130,193,.35),rgba(68,130,193,0) 70%)}
+ .login-art img.login-art-logo{position:relative;width:260px;height:auto}
+ .login-art::after{content:"";position:absolute;left:-120px;bottom:-200px;width:620px;height:620px;border-radius:50%;border:1px solid rgba(169,201,236,.14);box-shadow:0 0 0 80px rgba(169,201,236,.03),0 0 0 160px rgba(169,201,236,.02)}
+ .login-art-text{position:relative;max-width:640px}
+ .eyebrow{margin:0 0 12px;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:#a9c9ec;font-weight:700}
+ .login-quote{margin:0;font-family:Fraunces,Georgia,serif;font-weight:400;font-size:clamp(1.9rem,2.6vw,2.6rem);line-height:1.18;max-width:20ch}
+ .login-main{padding:64px 48px 40px;align-self:center}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+.skip{position:absolute;left:-9999px;top:10px;z-index:10;background:#0b1626;color:#fff;padding:10px 14px;border-radius:8px;font-weight:700;text-decoration:none}.skip:focus{left:12px}

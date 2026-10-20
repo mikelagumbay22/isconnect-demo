@@ -1,0 +1,53 @@
+<!doctype html><html lang="en-CA"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Clients | ISConnect portal</title>
+<link rel="icon" href="../favicon.ico"><link rel="apple-touch-icon" href="../assets/brand/apple-touch-icon.png"><meta name="theme-color" content="#0b1626"><link rel="stylesheet" href="../assets/portal/dashboard.css?v=20261020a">
+<script>(function(){var r=sessionStorage.getItem('isc_demo_role');if(r!=='owner'||!sessionStorage.getItem('isc_demo_admin')){location.replace('../login.html');}})();</script>
+</head><body data-page="clients" data-role="owner">
+<div class="topbar"><img src="../assets/brand/logo-white-220.webp?v=20261020a" srcset="../assets/brand/logo-white-220.webp?v=20261020a 1x, ../assets/brand/logo-white-440.webp?v=20261020a 2x" alt="International Students Connect" width="150" height="45"><button class="btn" type="button" data-menu aria-expanded="false" aria-controls="sideNav">☰ Menu</button></div>
+<div class="dash"><aside class="side" id="sideNav"><img src="../assets/brand/logo-white-440.webp?v=20261020a" alt="International Students Connect" width="200" height="60"><p>Signed in as<br><strong data-admin-name>Admin</strong></p><nav aria-label="Dashboard"><a href="dashboard.html">Dashboard</a><a href="clients.html" aria-current="page">Clients</a><a href="documents.html">Documents</a><a href="visas.html">Case types</a><a href="messages.html" class="nav-msg">Messages <span class="nav-badge" id="navMsgBadge" hidden></span></a><a href="../index.html">View public site</a><a href="#" data-signout>Sign out</a></nav></aside>
+<main class="main" id="main"><h1>Clients</h1>
+<div class="list-head"><button class="btn navy" id="addClientBtn" type="button">＋ Add client</button><div class="seg" id="scopeSeg" aria-label="Show clients"></div></div>
+<form class="card filters" onsubmit="return false"><div><label for="search">Search by name or case type</label><input id="search" type="search"></div>
+<div><label for="fStatus">Filter by status</label><select id="fStatus"><option value="">All statuses</option><option>New</option><option>Active</option><option>Submitted</option><option>Review</option><option>Approved</option><option>Denied</option><option>Cancelled</option></select></div>
+<div><label for="fType">Filter by case type</label><select id="fType"><option value="">All case types</option></select></div></form>
+<div class="tablewrap" style="margin-top:18px"><table><thead><tr><th>Client</th><th>Email</th><th>Phone</th><th>Assigned admin</th><th>Applications</th><th>Latest application</th><th>Actions</th></tr></thead><tbody id="clientRows"></tbody></table></div>
+<p><button class="btn" id="prevPage" type="button">← Previous</button> <span id="pageInfo" role="status"></span> <button class="btn" id="nextPage" type="button">Next →</button></p>
+<div class="modal-back" id="addClientModal" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="addClientTitle">
+<h2 id="addClientTitle">Add client</h2>
+<form id="addClientForm"><label for="newFirst">First name *</label><input id="newFirst" required>
+<label for="newMiddle">Middle name (optional)</label><input id="newMiddle">
+<label for="newLast">Last name *</label><input id="newLast" required>
+<label for="newEmail">Email address *</label><input id="newEmail" type="email" placeholder="name@example.com" required>
+<label for="newAdmin">Assigned admin</label><select id="newAdmin"></select>
+<label for="newPhone">Contact number</label><input id="newPhone" type="tel" placeholder="+1 403 555 01xx">
+<label for="newVisaType">Case type *</label><select id="newVisaType" required></select>
+<label for="newEffective">Effective date</label><select id="newEffective"></select>
+<p id="addClientError" role="alert" aria-live="assertive" style="color:#8a0e24;font-weight:700"></p>
+<div class="actions"><button class="btn navy" type="submit">Save client</button><button class="btn ghost" type="button" data-close="addClientModal">Cancel</button></div></form></div></div>
+<div class="modal-back" id="editClientModal" hidden><div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="editClientTitle">
+<div class="edit-head"><h2 id="editClientTitle">Edit client — <span id="editClientName"></span></h2><a class="btn sm msg-btn" id="editClientMsg" href="messages.html">Message</a></div>
+<form id="editClientForm">
+<fieldset style="border:1px solid var(--line);border-radius:12px;margin-bottom:6px"><legend class="muted" style="font-size:.85rem;padding:0 6px">Name — Read-only (cannot be edited here)</legend>
+<label for="editFirst">First name <span class="muted">(read-only)</span></label><input id="editFirst" readonly aria-readonly="true" class="readonly-field">
+<label for="editMiddle">Middle name <span class="muted">(read-only)</span></label><input id="editMiddle" readonly aria-readonly="true" class="readonly-field">
+<label for="editLast">Last name <span class="muted">(read-only)</span></label><input id="editLast" readonly aria-readonly="true" class="readonly-field">
+</fieldset>
+<label for="editEmail">Client Email</label><input id="editEmail" type="email">
+<label for="editPhone">Phone</label><input id="editPhone" type="tel">
+<label for="editAdmin">Assigned admin</label><select id="editAdmin"></select>
+<div class="actions"><button class="btn navy" type="submit">Save details</button></div><p id="editMsg" role="status" aria-live="polite"></p></form>
+<hr><h3>Add an application for this client</h3>
+<label for="editVisaType">Case type</label><select id="editVisaType"></select>
+<label for="editEffective">Effective date</label><select id="editEffective"></select>
+<p id="editAppError" role="alert" aria-live="assertive" style="color:#8a0e24;font-weight:700"></p>
+<p><button class="btn" id="addAppForClient" type="button">＋ Add application</button></p>
+<h3>This client’s applications</h3><ul id="editApps" class="app-cards"></ul>
+<div class="actions"><button class="btn ghost" type="button" data-close="editClientModal">Close</button></div></div></div><div class="modal-back" id="docsModal" hidden><div class="modal wide docs-modal" role="dialog" aria-modal="true" aria-labelledby="docsTitle">
+<div class="docs-head"><h2 id="docsTitle">Documents</h2><button class="btn ghost" type="button" data-close="docsModal" data-autofocus>← Back to client</button></div>
+<p id="docsSub" class="muted"></p><p id="docsSummary" class="docs-summary" role="status"></p>
+<h3>Submitted documents</h3><ul id="docsList" class="doc-list"></ul>
+<div id="docsMissingWrap"><h3>Missing required documents</h3><ul id="docsMissing" class="doc-missing"></ul></div>
+<p id="docsMsg" class="muted" role="status" aria-live="polite"></p>
+<div class="actions"><button class="btn navy" type="button" data-close="docsModal">Close</button></div></div></div><footer class="mini-footer"><p class="policy-links"><a href="../privacy.html">Privacy Policy</a><span class="sep" aria-hidden="true">|</span><a href="../cookies.html">Cookies Policy</a></p><p class="mini-disc">Concept site, not affiliated with or approved by International Students Connect.</p></footer></main></div>
+<div class="modal-back" id="fileDeleteModal" hidden><div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="fileDeleteTitle" aria-describedby="fileDeleteMsg"><h2 id="fileDeleteTitle">Delete uploaded document?</h2><p id="fileDeleteMsg"></p><div class="actions"><button class="btn ghost s-btn" type="button" data-close="fileDeleteModal" data-autofocus>Cancel</button><button class="btn danger-btn s-btn" type="button" id="confirmFileDelete">Delete</button></div></div></div>
+<script src="../assets/portal/sample-seeds.js?v=20261020a"></script><script src="../assets/portal/portal-data.js?v=20261020a"></script><script src="../assets/portal/portal.js?v=20261020a"></script><script src="../assets/portal/messages.js?v=20261020a"></script></body></html>

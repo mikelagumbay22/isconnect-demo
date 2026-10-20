@@ -1,0 +1,32 @@
+<!doctype html><html lang="en-CA"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Documents | ISConnect portal</title>
+<link rel="icon" href="../favicon.ico"><link rel="apple-touch-icon" href="../assets/brand/apple-touch-icon.png"><meta name="theme-color" content="#0b1626"><link rel="stylesheet" href="../assets/portal/dashboard.css?v=20261020a">
+<script>(function(){var r=sessionStorage.getItem('isc_demo_role');if(r!=='owner'||!sessionStorage.getItem('isc_demo_admin')){location.replace('../login.html');}})();</script>
+</head><body data-page="documents" data-role="owner">
+<div class="topbar"><img src="../assets/brand/logo-white-220.webp?v=20261020a" srcset="../assets/brand/logo-white-220.webp?v=20261020a 1x, ../assets/brand/logo-white-440.webp?v=20261020a 2x" alt="International Students Connect" width="150" height="45"><button class="btn" type="button" data-menu aria-expanded="false" aria-controls="sideNav">☰ Menu</button></div>
+<div class="dash"><aside class="side" id="sideNav"><img src="../assets/brand/logo-white-440.webp?v=20261020a" alt="International Students Connect" width="200" height="60"><p>Signed in as<br><strong data-admin-name>Admin</strong></p><nav aria-label="Dashboard"><a href="dashboard.html">Dashboard</a><a href="clients.html">Clients</a><a href="documents.html" aria-current="page">Documents</a><a href="visas.html">Case types</a><a href="messages.html" class="nav-msg">Messages <span class="nav-badge" id="navMsgBadge" hidden></span></a><a href="../index.html">View public site</a><a href="#" data-signout>Sign out</a></nav></aside>
+<main class="main" id="main"><h1>Document requirements library</h1>
+<p class="muted">Deleting a document also removes it from any case type required-document lists that use it.</p>
+<p><button class="btn navy" id="addDocBtn" type="button">＋ Add document</button></p>
+<p class="muted">Documents have no application type of their own — a document becomes a requirement only when it is picked into a case type’s required list on the Case types page.</p>
+<p class="muted">Attach an example to a requirement to show clients an example of it (images and PDFs preview inline; max 1.5 MB per file).</p><input type="file" id="sampleFile" accept="image/*,application/pdf,.pdf,.png,.jpg,.jpeg,.webp,.gif,.txt,.doc,.docx" hidden><p id="sampleStatus" class="sample-status" role="status" aria-live="polite"></p>
+<div class="tablewrap" style="margin-top:18px"><table><thead><tr><th>Document</th><th>Version</th><th>Required for (case types)</th><th>Status</th><th>Created</th><th>Updated</th><th>Uploaded</th><th>Example file</th><th>Actions</th></tr></thead><tbody id="docRows"></tbody></table></div>
+<div class="modal-back" id="docModal" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="docTitle">
+<h2 id="docTitle">Add / edit document</h2>
+<form id="docForm"><input type="hidden" id="docId">
+<label for="docName">Document name</label><input id="docName" required>
+
+<label for="docVersion">Version</label><input id="docVersion" placeholder="v1.0">
+<label for="docStatus">Status</label><select id="docStatus"><option>Active</option><option>Draft</option></select>
+<p id="docMsg" role="status" aria-live="polite"></p>
+<div class="actions"><button class="btn navy" type="submit">Save document</button><button class="btn ghost" type="button" data-close="docModal">Cancel</button></div></form></div></div>
+<div class="modal-back" id="sampleModal" hidden><div class="modal wide sample-modal" role="dialog" aria-modal="true" aria-labelledby="sampleTitle">
+<button class="dialog-x" type="button" data-close="sampleModal" aria-label="Close" data-autofocus>×</button>
+<h2 id="sampleTitle">Example document</h2><p class="sample-meta" id="sampleMeta"></p><div class="sample-preview" id="samplePreview"></div>
+<div class="actions"><a class="btn navy s-btn" id="sampleDownload" href="#" download hidden>Download</a><button class="btn ghost s-btn outline" type="button" data-close="sampleModal">Close</button></div></div></div>
+<div class="modal-back" id="sampleRemoveModal" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="sampleRemoveTitle">
+<h2 id="sampleRemoveTitle">Remove example?</h2><p id="sampleRemoveMsg"></p><div class="actions"><button class="btn danger-btn" id="confirmSampleRemove" type="button">Remove example</button><button class="btn ghost" type="button" data-close="sampleRemoveModal">Cancel</button></div></div></div>
+<div class="modal-back" id="confirmModal" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+<h2 id="confirmTitle">Delete document?</h2><p id="deleteMsg"></p>
+<div class="actions"><button class="btn" id="confirmDelete" type="button" style="background:#8a0e24;color:#fff;border-color:#8a0e24">Delete</button><button class="btn ghost" type="button" data-close="confirmModal">Cancel</button></div></div></div><footer class="mini-footer"><p class="policy-links"><a href="../privacy.html">Privacy Policy</a><span class="sep" aria-hidden="true">|</span><a href="../cookies.html">Cookies Policy</a></p><p class="mini-disc">Concept site, not affiliated with or approved by International Students Connect.</p></footer></main></div>
+<script src="../assets/portal/sample-seeds.js?v=20261020a"></script><script src="../assets/portal/portal-data.js?v=20261020a"></script><script src="../assets/portal/portal.js?v=20261020a"></script><script src="../assets/portal/messages.js?v=20261020a"></script></body></html>
