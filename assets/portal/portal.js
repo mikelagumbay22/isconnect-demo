@@ -53,7 +53,7 @@ if(page==='client-dashboard'){
  wireReset();
 }
 /* Empty-state block. Image: AI-generated still (Higgsfield gpt_image_2_5), disclosed in its alt text. */
-function emptyState(title,body){return '<div class="empty-state"><img src="../assets/portal/portal-empty-480.webp?v=20261020a" srcset="../assets/portal/portal-empty-240.webp?v=20261020a 240w, ../assets/portal/portal-empty-480.webp?v=20261020a 480w" sizes="200px" width="480" height="360" loading="lazy" alt="AI-generated image: an empty letter tray beside a small plant on a desk"><div><h3>'+esc(title)+'</h3><p class="muted">'+esc(body)+'</p></div></div>';}
+function emptyState(title,body){return '<div class="empty-state"><img src="../assets/portal/portal-empty-480.webp?v=20261020b" srcset="../assets/portal/portal-empty-240.webp?v=20261020b 240w, ../assets/portal/portal-empty-480.webp?v=20261020b 480w" sizes="200px" width="480" height="360" loading="lazy" alt="AI-generated image: an empty letter tray beside a small plant on a desk"><div><h3>'+esc(title)+'</h3><p class="muted">'+esc(body)+'</p></div></div>';}
 /* Owner-updates carousel: arrows, dots, swipe, Left/Right keys, optional autoplay (off by default; pauses on hover/focus; unavailable under reduced motion). */
 function initCarousel(items){var track=$('announcements'),vp=$('cViewport'),dots=$('cDots'),root=$('updates');if(!track)return;var n=items.length,i=0,timer=null,playing=false,paused=false;
  var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -82,7 +82,7 @@ if(page==='application'){
  var FL={'received':'Received','pending review':'Pending review','approved':'Approved','rejected':'Rejected'};
  function render(focusSel){ var p=S.progress(data,app); var done=cl.filter(function(x){return x.done;}).length;
   /* Header image: AI-generated still (Higgsfield gpt_image_2_5), disclosed in alt text. */
-  $('appDetail').innerHTML='<div class="app-hero"><img src="../assets/portal/portal-app-1280.webp?v=20261020a" srcset="../assets/portal/portal-app-640.webp?v=20261020a 640w, ../assets/portal/portal-app-1280.webp?v=20261020a 1280w" sizes="(max-width: 900px) 100vw, 960px" width="1280" height="300" alt="AI-generated image: a folder, a pen and a notebook on a wooden desk"></div>'
+  $('appDetail').innerHTML='<div class="app-hero"><img src="../assets/portal/portal-app-1280.webp?v=20261020b" srcset="../assets/portal/portal-app-640.webp?v=20261020b 640w, ../assets/portal/portal-app-1280.webp?v=20261020b 1280w" sizes="(max-width: 900px) 100vw, 960px" width="1280" height="300" alt="AI-generated image: a folder, a pen and a notebook on a wooden desk"></div>'
   +'<p>'+badge(app.status)+' <span class="badge">'+esc(app.type)+'</span></p><h2>'+esc(app.type)+' application</h2><p class="muted">Started '+esc(app.date)+' · Effective '+esc(S.effectiveDateOf(data,app)||'—')+'</p>'
   +'<div class="bar" role="progressbar" aria-valuenow="'+p+'" aria-valuemin="0" aria-valuemax="100" aria-label="Checklist progress"><i style="width:'+p+'%"></i></div><p><strong>'+p+'% complete</strong> · Checklist status: <strong>'+(p===100?'Complete':'Incomplete')+'</strong> ('+done+' of '+cl.length+' done)</p>'
   +(app.status==='Review'?'<p class="review-note">All required documents are uploaded. Your counselor is reviewing your application.</p>':'')

@@ -1,6 +1,6 @@
 /* ISConnect concept site — design system. Fonts: Fraunces + Plus Jakarta Sans (OFL), self-hosted latin subsets. */
-@font-face{font-family:"Fraunces";src:url("../fonts/fraunces-var-latin.woff2?v=20261020a") format("woff2");font-weight:300 700;font-style:normal;font-display:optional;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
-@font-face{font-family:"Jakarta";src:url("../fonts/jakarta-var-latin.woff2?v=20261020a") format("woff2");font-weight:300 800;font-style:normal;font-display:optional;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Fraunces";src:url("../fonts/fraunces-var-latin.woff2?v=20261020b") format("woff2");font-weight:300 700;font-style:normal;font-display:optional;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Jakarta";src:url("../fonts/jakarta-var-latin.woff2?v=20261020b") format("woff2");font-weight:300 800;font-style:normal;font-display:optional;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 :root{
  --ink:#0b1626;--ink-2:#122039;--ink-3:#1b2d4c;--night:#070f1b;
  --ivory:#faf7f1;--paper:#fff;--sand:#f2ece1;--stone:#e3dacb;
@@ -514,3 +514,24 @@ html.lock,html.lock body{overflow:hidden}
 /* long inner-banner titles keep every banner the same height */
 .page-hero h1.long{font-size:clamp(2.2rem,4.2vw,3.9rem);max-width:20ch}
 @media(max-width:600px){.page-hero h1.long{font-size:2.05rem}.page-hero .lead{font-size:1rem;line-height:1.55}}
+/* client photos (about) */
+.frame.r53{aspect-ratio:5/3}.frame.rfair{aspect-ratio:610/493}
+.client-photo{margin:0}.client-photo picture{display:block;width:100%;height:100%}
+.client-photo::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);pointer-events:none}
+/* team headshots + partner logo marquee */
+.team{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:22px}
+.member{flex-direction:column;align-items:stretch;gap:0;padding:0;overflow:hidden;border-radius:calc(var(--r) + 4px);box-shadow:0 1px 0 rgba(11,22,38,.04),0 18px 40px -28px rgba(11,22,38,.35)}
+.member .hs{margin:0;aspect-ratio:338/345;overflow:hidden;background:#eceae6}
+.member .hs img{width:100%;height:100%;object-fit:cover;display:block;transition:transform 1s var(--ease-out)}
+.member:hover .hs img{transform:scale(1.04)}
+.member .m-t{padding:18px 20px 22px;border-top:1px solid var(--line)}
+.logo-mq{position:relative;overflow:hidden;padding:6px 0;-webkit-mask:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent);mask:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent);outline-offset:4px}
+.lm-track{display:flex;width:max-content;animation:mq 90s linear infinite}
+.logo-mq:hover .lm-track,.logo-mq:focus-within .lm-track,.logo-mq:focus .lm-track{animation-play-state:paused}
+.lm-set{display:flex;gap:16px;margin:0;padding:0 8px 0 8px;list-style:none}
+.logo-card{flex:none;width:220px;height:112px;display:grid;place-items:center;padding:18px 22px;background:#fff;border:1px solid var(--line);border-radius:var(--r);transition:border-color .3s,transform .4s var(--ease-out)}
+.logo-card img{max-width:100%;max-height:56px;width:auto;height:auto;filter:grayscale(1);opacity:.75;transition:filter .4s,opacity .4s}
+.logo-card:hover{border-color:rgba(11,22,38,.25);transform:translateY(-2px)}
+.logo-card:hover img,.logo-mq:focus-within .logo-card img{filter:none;opacity:1}
+@media (max-width:600px){.logo-card{width:170px;height:96px}.logo-card img{max-height:46px}}
+@media (prefers-reduced-motion:reduce){.logo-mq{-webkit-mask:none;mask:none}.lm-track{animation:none;width:auto}.lm-set{flex-wrap:wrap;justify-content:center}.lm-set.dup{display:none}.logo-card img{filter:none;opacity:1}}
