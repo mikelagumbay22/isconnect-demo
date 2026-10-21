@@ -1,6 +1,6 @@
 /* ISConnect concept site — design system. Fonts: Fraunces + Plus Jakarta Sans (OFL), self-hosted latin subsets. */
-@font-face{font-family:"Fraunces";src:url("../fonts/fraunces-var-latin.woff2?v=20261020c") format("woff2");font-weight:300 700;font-style:normal;font-display:optional;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
-@font-face{font-family:"Jakarta";src:url("../fonts/jakarta-var-latin.woff2?v=20261020c") format("woff2");font-weight:300 800;font-style:normal;font-display:optional;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Fraunces";src:url("../fonts/fraunces-var-latin.woff2?v=20261021a") format("woff2");font-weight:300 700;font-style:normal;font-display:optional;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Jakarta";src:url("../fonts/jakarta-var-latin.woff2?v=20261021a") format("woff2");font-weight:300 800;font-style:normal;font-display:optional;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 :root{
  --ink:#0b1626;--ink-2:#122039;--ink-3:#1b2d4c;--night:#070f1b;
  --ivory:#faf7f1;--paper:#fff;--sand:#f2ece1;--stone:#e3dacb;
