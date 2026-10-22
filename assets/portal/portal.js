@@ -9,6 +9,29 @@ function clientById(id){return data.clients.find(function(c){return c.id===id;})
 function badge(st){return '<span class="badge '+esc(st)+'">'+esc(st)+'</span>';}
 var PENCIL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>';
 var TRASH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m1 0-1 14H8L7 6"/></svg>';
+/* ---- Roles & permissions (Super Admin / Staff). The nav lists only pages the signed-in user may open; a disallowed page shows a no-access notice. ---- */
+var IS_OWNER=document.body.getAttribute('data-role')==='owner',ME0=S.currentAdminId();
+var SUPER=S.isSuper(data,ME0);
+function can(area,act){return S.can(data,ME0,area,act);}
+var NAV=[['dashboard.html','Dashboard','dashboard'],['clients.html','Clients','clients'],['documents.html','Documents','documents'],['visas.html','Case types','casetypes'],['messages.html','Messages','messages'],['logs.html','Activity logs','logs'],['permissions.html','Permissions','_super']];
+var PAGE_AREA={'owner-dashboard':'dashboard',clients:'clients',documents:'documents',visas:'casetypes',messages:'messages',logs:'logs',permissions:'_super'};
+function allowed(area){return area==='_super'?SUPER:can(area,'view');}
+function meName(){return IS_OWNER?S.adminName(S.adminById(data,ME0)):S.clientName(data.clients.find(function(c){return c.id===S.CLIENT_ID;})||{});}
+if(IS_OWNER){
+ if(!S.adminById(data,ME0)){sessionStorage.removeItem('isc_demo_role');location.replace('../login.html');}
+ var here=location.pathname.split('/').pop()||'dashboard.html',navOk=NAV.filter(function(n){return allowed(n[2]);});
+ var navEl=document.querySelector('.side nav');
+ if(navEl)navEl.innerHTML=navOk.map(function(n){var m=n[0]==='messages.html';return '<a href="'+n[0]+'"'+(m?' class="nav-msg"':'')+(n[0]===here?' aria-current="page"':'')+'>'+n[1]+(m?' <span class="nav-badge" id="navMsgBadge" hidden></span>':'')+'</a>';}).join('')+'<a href="../index.html">View public site</a><a href="#" data-signout>Sign out</a>';
+ var sideP=document.querySelector('.side > p');if(sideP&&!sideP.querySelector('.role-tag'))sideP.insertAdjacentHTML('beforeend','<span class="role-tag">'+esc(S.ROLE_LABEL[SUPER?'super':'staff'])+'</span>');
+ var pArea=PAGE_AREA[page];
+ if(pArea&&!allowed(pArea)){
+  if(page==='owner-dashboard'&&navOk.length){location.replace(navOk[0][0]);}
+  page='noaccess';document.body.setAttribute('data-page','noaccess');
+  var mn=$('main'),ft=mn.querySelector('.mini-footer');
+  mn.innerHTML='<section class="no-access" role="alert"><h1>You don’t have access to this page</h1><p class="muted">Your account doesn’t include permission for this area. A Super Admin can change this on the Permissions page.</p>'+(navOk.length?'<p><a class="btn navy" href="'+navOk[0][0]+'">Go to '+esc(navOk[0][1])+'</a></p>':'')+'</section>'+(ft?ft.outerHTML:'');
+ }
+}
+try{if(sessionStorage.getItem('isc_login_evt')){sessionStorage.removeItem('isc_login_evt');S.log(data,'Login','Account',meName(),'Signed in');S.save(data);}}catch(e){}
 /* --- modal helpers: open/close, Escape, focus return, Tab trap-lite --- */
 var lastFocus=null,modalStack=[];/* stack: [{id,ret}] so a modal can open over another; Esc/close returns focus to its opener */
 function topModal(){var t=modalStack[modalStack.length-1];return t?$(t.id):document.querySelector('.modal-back:not([hidden])');}
@@ -19,16 +42,16 @@ document.addEventListener('keydown',function(e){
  if(e.key==='Escape'){var tm=topModal();if(tm){e.preventDefault();closeModal(tm.id);}}
  if(e.key==='Tab'){var open=topModal();if(!open)return;var items=[].filter.call(open.querySelectorAll('button,input,select,textarea,a[href],[tabindex="0"]'),function(el){return !el.disabled&&el.offsetParent!==null;});if(!items.length)return;var first=items[0],last=items[items.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}
 });
-document.querySelectorAll('[data-signout]').forEach(function(b){b.addEventListener('click',function(e){e.preventDefault();sessionStorage.removeItem('isc_demo_role');sessionStorage.removeItem('isc_demo_admin');sessionStorage.removeItem('isc_scope');location.href='../index.html';});});
+document.querySelectorAll('[data-signout]').forEach(function(b){b.addEventListener('click',function(e){e.preventDefault();try{S.log(data,'Logout','Account',meName(),'Signed out');S.save(data);}catch(x){}sessionStorage.removeItem('isc_demo_role');sessionStorage.removeItem('isc_demo_admin');sessionStorage.removeItem('isc_scope');location.href='../index.html';});});
 document.querySelectorAll('[data-menu]').forEach(function(b){b.addEventListener('click',function(){var s=document.querySelector('.side');b.setAttribute('aria-expanded',s.classList.toggle('open'));});});
 function wireReset(){var b=$('resetDemo');if(b)b.addEventListener('click',function(){data=S.reset();location.reload();});}
 /* ---- Multi-admin: every admin sees every client; 'My clients' = assignedAdminId is the signed-in admin. Choice saved per tab. ---- */
 var ME=S.currentAdminId();
-function getScope(){return sessionStorage.getItem('isc_scope')==='all'?'all':'mine';}
+function getScope(){if(SUPER)return 'all';if(!can('clients','all'))return 'mine';return sessionStorage.getItem('isc_scope')==='all'?'all':'mine';}
 function inScope(c,sc){return (sc||getScope())==='all'||!!(c&&c.assignedAdminId===ME);}
 function adminLabel(id){var a=S.adminById(data,id);return a?S.adminName(a)+(a.id===ME?' (you)':''):'Unassigned';}
-function adminOptions(sel){return (data.admins||[]).map(function(a){return '<option value="'+esc(a.id)+'"'+(a.id===sel?' selected':'')+'>'+esc(S.adminName(a))+(a.id===ME?' (you)':'')+'</option>';}).join('');}
-function scopeToggle(el,onChange){if(!el)return;var cur=getScope();
+function adminOptions(sel){return S.staffList(data).map(function(a){return '<option value="'+esc(a.id)+'"'+(a.id===sel?' selected':'')+'>'+esc(S.adminName(a))+(a.id===ME?' (you)':'')+'</option>';}).join('');}
+function scopeToggle(el,onChange){if(!el)return;if(SUPER||!can('clients','all')){el.hidden=true;el.innerHTML='';return;}var cur=getScope();
  el.setAttribute('role','group');if(!el.getAttribute('aria-label'))el.setAttribute('aria-label','Show clients');
  el.innerHTML='<button type="button" class="seg-btn" data-scope="mine" aria-pressed="'+(cur==='mine')+'">My clients</button><button type="button" class="seg-btn" data-scope="all" aria-pressed="'+(cur==='all')+'">All clients</button>';
  el.querySelectorAll('[data-scope]').forEach(function(b){b.addEventListener('click',function(){var v=b.getAttribute('data-scope');if(v===getScope())return;sessionStorage.setItem('isc_scope',v);
@@ -36,7 +59,7 @@ function scopeToggle(el,onChange){if(!el)return;var cur=getScope();
 window.ISCScope={get:getScope,toggle:scopeToggle,me:ME};
 document.querySelectorAll('[data-admin-name]').forEach(function(el){el.textContent=S.adminName(S.adminById(data,ME));});
 function typeCountry(n){var v=(data.visas||[]).find(function(x){return x.name===n;});return S.visaCountry(v);}
-function counselorHtml(a){var c=S.counselorById(a&&a.counselorId);if(!c)return '';return '<p class="counselor"><picture><source type="image/webp" srcset="../assets/img/team/'+c.photo+'.webp?v=20261022a"><img src="../assets/img/team/'+c.photo+'.jpg?v=20261022a" width="40" height="40" alt="" decoding="async"></picture><span>Education Counselor: <strong>'+esc(c.name)+'</strong></span></p>';}
+function counselorHtml(a){var c=S.counselorById(a&&a.counselorId);if(!c)return '';return '<p class="counselor"><picture><source type="image/webp" srcset="../assets/img/team/'+c.photo+'.webp?v=20261022c"><img src="../assets/img/team/'+c.photo+'.jpg?v=20261022c" width="40" height="40" alt="" decoding="async"></picture><span>Education Counselor: <strong>'+esc(c.name)+'</strong></span></p>';}
 /* Active = still in progress (New, Active, Submitted, Review). Closed outcomes are excluded: Approved, Denied, Cancelled (withdrawn). */
 var CLOSED_STATUSES=['Approved','Denied','Cancelled','Withdrawn','Closed'];
 function isActiveApp(a){return CLOSED_STATUSES.indexOf(a.status)<0;}
@@ -58,7 +81,7 @@ if(page==='client-dashboard'){
  wireReset();
 }
 /* Empty-state block. Image: AI-generated still (Higgsfield gpt_image_2_5), disclosed in its alt text. */
-function emptyState(title,body){return '<div class="empty-state"><img src="../assets/portal/portal-empty-480.webp?v=20261022a" srcset="../assets/portal/portal-empty-240.webp?v=20261022a 240w, ../assets/portal/portal-empty-480.webp?v=20261022a 480w" sizes="200px" width="480" height="360" loading="lazy" alt="AI-generated image: an empty letter tray beside a small plant on a desk"><div><h3>'+esc(title)+'</h3><p class="muted">'+esc(body)+'</p></div></div>';}
+function emptyState(title,body){return '<div class="empty-state"><img src="../assets/portal/portal-empty-480.webp?v=20261022c" srcset="../assets/portal/portal-empty-240.webp?v=20261022c 240w, ../assets/portal/portal-empty-480.webp?v=20261022c 480w" sizes="200px" width="480" height="360" loading="lazy" alt="AI-generated image: an empty letter tray beside a small plant on a desk"><div><h3>'+esc(title)+'</h3><p class="muted">'+esc(body)+'</p></div></div>';}
 /* Owner-updates carousel: arrows, dots, swipe, Left/Right keys, optional autoplay (off by default; pauses on hover/focus; unavailable under reduced motion). */
 function initCarousel(items){var track=$('announcements'),vp=$('cViewport'),dots=$('cDots'),root=$('updates');if(!track)return;var n=items.length,i=0,timer=null,playing=false,paused=false;
  var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -87,7 +110,7 @@ if(page==='application'){
  var FL={'received':'Received','pending review':'Pending review','approved':'Approved','rejected':'Rejected'};
  function render(focusSel){ var p=S.progress(data,app); var done=cl.filter(function(x){return x.done;}).length;
   /* Header image: AI-generated still (Higgsfield gpt_image_2_5), disclosed in alt text. */
-  $('appDetail').innerHTML='<div class="app-hero"><img src="../assets/portal/portal-app-1280.webp?v=20261022a" srcset="../assets/portal/portal-app-640.webp?v=20261022a 640w, ../assets/portal/portal-app-1280.webp?v=20261022a 1280w" sizes="(max-width: 900px) 100vw, 960px" width="1280" height="300" alt="AI-generated image: a folder, a pen and a notebook on a wooden desk"></div>'
+  $('appDetail').innerHTML='<div class="app-hero"><img src="../assets/portal/portal-app-1280.webp?v=20261022c" srcset="../assets/portal/portal-app-640.webp?v=20261022c 640w, ../assets/portal/portal-app-1280.webp?v=20261022c 1280w" sizes="(max-width: 900px) 100vw, 960px" width="1280" height="300" alt="AI-generated image: a folder, a pen and a notebook on a wooden desk"></div>'
   +'<p>'+badge(app.status)+' <span class="badge">'+esc(app.type)+'</span></p><h2>'+esc(app.type)+' application</h2><p class="muted">Started '+esc(app.date)+' · Effective '+esc(S.effectiveDateOf(data,app)||'—')+'</p>'+counselorHtml(app)
   +'<div class="bar" role="progressbar" aria-valuenow="'+p+'" aria-valuemin="0" aria-valuemax="100" aria-label="Checklist progress"><i style="width:'+p+'%"></i></div><p><strong>'+p+'% complete</strong> · Checklist status: <strong>'+(p===100?'Complete':'Incomplete')+'</strong> ('+done+' of '+cl.length+' done)</p>'
   +(app.status==='Review'?'<p class="review-note">All required documents are uploaded. Your counselor is reviewing your application.</p>':'')
@@ -100,7 +123,7 @@ if(page==='application'){
   document.querySelectorAll('[data-sample]').forEach(function(b){b.addEventListener('click',function(){openSample(S.docById(data,b.getAttribute('data-sample')),b);});});
   document.querySelectorAll('[data-upload]').forEach(function(inp){inp.addEventListener('change',function(){if(!inp.files||!inp.files.length)return;var idx=Number(inp.getAttribute('data-upload'));var r=cl[idx];r.files=r.files||[];var t=S.today(),names=[];
    [].forEach.call(inp.files,function(f){var nm=S.fileName(data,app,r,S.extOf(f.name),t);names.push(nm);r.files.push({name:nm,at:t,status:'pending review'});});
-   S.syncRow(r);S.syncReview(data,app);app.updatedAt=t;S.save(data);render('[data-upload="'+idx+'"]');$('appMsg').textContent='Uploaded '+names.join(', ')+'.';});});
+   S.syncRow(r);S.syncReview(data,app);app.updatedAt=t;S.log(data,'Upload','Documents',names.join(', '),'Uploaded for '+app.type);S.save(data);render('[data-upload="'+idx+'"]');$('appMsg').textContent='Uploaded '+names.join(', ')+'.';});});
   document.querySelectorAll('[data-rm]').forEach(function(b){b.addEventListener('click',function(){var q=b.getAttribute('data-rm').split(':'),r=cl[+q[0]],f=r.files.splice(+q[1],1)[0];
    S.syncRow(r);S.syncReview(data,app);app.updatedAt=S.today();S.save(data);var left=r.files.length;render(left?'[data-rm="'+q[0]+':'+Math.min(+q[1],left-1)+'"]':'[data-upload="'+q[0]+'"]');$('appMsg').textContent='Removed '+f.name+'.';});});
   if(focusSel){var el=document.querySelector(focusSel);if(el)el.focus();}
@@ -172,11 +195,11 @@ function renderDocs(appId){var a=appById(appId);if(!a)return;docsApp=appId;var v
  $('docsMissingWrap').hidden=!cl.length;
  function find(key){var q=key.split(':');var r=cl.find(function(x){return x.docId===q[0];});return {r:r,f:r.files[+q[1]],k:+q[1]};}
  document.querySelectorAll('#docsList [data-dl]').forEach(function(b){b.addEventListener('click',function(){var g=find(b.getAttribute('data-dl'));downloadPlaceholder(a,g.r,visa,g.f);});});
- document.querySelectorAll('#docsList [data-fstatus]').forEach(function(sel){sel.addEventListener('change',function(){var g=find(sel.getAttribute('data-fstatus'));g.f.status=sel.value;S.syncRow(g.r);a.updatedAt=S.today();S.save(data);$('docsMsg').textContent='Saved: '+g.f.name+' is now '+DOC_LABEL[sel.value]+'.';if(onDocsChanged)onDocsChanged();});});
+ document.querySelectorAll('#docsList [data-fstatus]').forEach(function(sel){sel.addEventListener('change',function(){var g=find(sel.getAttribute('data-fstatus'));g.f.status=sel.value;S.syncRow(g.r);a.updatedAt=S.today();S.log(data,'Status change','Documents',g.f.name,'File marked '+DOC_LABEL[sel.value]+' for '+S.clientName(clientById(a.clientId)));S.save(data);$('docsMsg').textContent='Saved: '+g.f.name+' is now '+DOC_LABEL[sel.value]+'.';if(onDocsChanged)onDocsChanged();});});
  document.querySelectorAll('#docsList [data-fdel]').forEach(function(b){b.addEventListener('click',function(){var g=find(b.getAttribute('data-fdel'));pendingFile={appId:a.id,docId:g.r.docId,k:g.k};$('fileDeleteMsg').textContent='Delete “'+g.f.name+'” from '+g.r.label+'? This cannot be undone.';openModal('fileDeleteModal',b);});});}
 function openDocs(appId,opener){renderDocs(appId);openModal('docsModal',opener);}
 if($('confirmFileDelete'))$('confirmFileDelete').addEventListener('click',function(){if(!pendingFile)return;var a=appById(pendingFile.appId),cl=S.ensureChecklist(data,a),r=cl.find(function(x){return x.docId===pendingFile.docId;});
- var f=r.files.splice(pendingFile.k,1)[0];S.syncRow(r);var was=a.status;S.syncReview(data,a);a.updatedAt=S.today();S.save(data);pendingFile=null;
+ var f=r.files.splice(pendingFile.k,1)[0];S.syncRow(r);var was=a.status;S.syncReview(data,a);a.updatedAt=S.today();S.log(data,'Delete','Documents',f.name,'Removed submitted file for '+S.clientName(clientById(a.clientId)));S.save(data);pendingFile=null;
  closeModal('fileDeleteModal');renderDocs(a.id);if(onDocsChanged)onDocsChanged();
  $('docsMsg').textContent='Deleted '+f.name+'.'+(was!==a.status?' Status changed from '+was+' to '+a.status+'.':'');var t=$('docsSummary');t.tabIndex=-1;t.focus();});
 /* Uploads store filenames only, so View/Download generates a small plain-text placeholder in the browser (Blob, .txt) named after the uploaded file. */
@@ -296,7 +319,31 @@ function awaitingApps(){return A.filter(function(a){return S.progress(data,a)<10
   pgr.innerHTML=h;$('recentInfo').textContent='Showing '+(start+1)+'–'+Math.min(start+PER,recent.length)+' of '+recent.length;
   pgr.querySelectorAll('[data-pg]').forEach(function(b){b.addEventListener('click',function(){var v=b.getAttribute('data-pg');pg=v==='prev'?pg-1:v==='next'?pg+1:+v;renderRecent();var f=pgr.querySelector('[aria-current]');if(f)f.focus();});});}
  renderRecent();
+ drawExtras();
 }
+function drawExtras(){var el=$('dashExtra');if(!el)return;var ACTIVE={New:1,Active:1,Submitted:1,Review:1};
+ function bars(rows){var mx=Math.max.apply(null,rows.map(function(r){return r[1];}).concat([1]));return '<ul class="hbars">'+rows.map(function(r){return '<li><span class="hb-l">'+esc(r[0])+'</span><span class="hb-t"><span class="hb-f" style="width:'+Math.round(r[1]/mx*100)+'%"></span></span><b>'+r[1]+'</b></li>';}).join('')+'</ul>';}
+ var since=Date.now()-30*864e5;
+ function acts(id){return (data.logs||[]).filter(function(l){return l.actorId===id&&Date.parse(l.at)>=since;}).length;}
+ function logRows(list){return list.length?list.map(function(l){return '<li><span class="act-who">'+esc(l.actor)+'</span> <span class="muted">'+esc(l.action.toLowerCase())+'</span> '+esc(l.target)+'<span class="act-when muted">'+esc(new Date(l.at).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}))+'</span></li>';}).join(''):'<li class="muted">No activity yet.</li>';}
+ var logs=(data.logs||[]).slice().sort(function(a,b){return a.at<b.at?1:-1;});
+ if(SUPER){
+  var ST=['New','Active','Submitted','Review','Approved','Denied','Cancelled'];
+  var byS=ST.map(function(s){return [s,A.filter(function(a){return a.status===s;}).length];});
+  var cs={};A.forEach(function(a){var v=S.visaFor?S.visaFor(data,a):null;var k=v?S.visaCountry(v):'—';cs[k]=(cs[k]||0)+1;});
+  var byC=Object.keys(cs).map(function(k){return [k,cs[k]];}).sort(function(a,b){return b[1]-a[1];});
+  var staff=S.staffList(data).map(function(s){var cl=data.clients.filter(function(c){return c.assignedAdminId===s.id;}),ids={};cl.forEach(function(c){ids[c.id]=1;});var ap=data.applications.filter(function(a){return ids[a.clientId];});
+   return '<tr><td><span class="cell-strong">'+esc(S.adminName(s))+'</span></td><td class="num">'+cl.length+'</td><td class="num">'+ap.length+'</td><td class="num">'+ap.filter(function(a){return ACTIVE[a.status];}).length+'</td><td class="num">'+ap.filter(function(a){return a.status==='Approved';}).length+'</td><td class="num">'+ap.filter(function(a){return S.progress(data,a)<100&&ACTIVE[a.status];}).length+'</td><td class="num">'+acts(s.id)+'</td></tr>';}).join('');
+  el.innerHTML='<div class="chart-grid"><section class="s-card"><div class="s-card-head"><h2>Applications by status</h2></div>'+bars(byS)+'</section><section class="s-card"><div class="s-card-head"><h2>Applications by country</h2></div>'+bars(byC)+'</section></div>'
+   +'<section class="s-card dash-sec"><div class="s-card-head"><h2>Staff performance</h2></div><div class="s-table-wrap"><table class="s-table"><thead><tr><th>Staff member</th><th class="num">Clients</th><th class="num">Applications</th><th class="num">Active</th><th class="num">Approved</th><th class="num">Awaiting documents</th><th class="num">Actions (30 days)</th></tr></thead><tbody>'+staff+'</tbody></table></div></section>'
+   +'<section class="s-card dash-sec"><div class="sec-head"><div class="s-card-head"><h2>Recent activity</h2></div><a href="logs.html">View all activity</a></div><ul class="act-list">'+logRows(logs.slice(0,8))+'</ul></section>';
+ }else{
+  var mine=logs.filter(function(l){return l.actorId===ME0;});
+  var k=[['Active applications',A.filter(function(a){return ACTIVE[a.status];}).length,'New, active, submitted or in review'],['Approved',A.filter(function(a){return a.status==='Approved';}).length,'All time, your clients'],['Submitted',A.filter(function(a){return a.status==='Submitted'||a.status==='Review';}).length,'Submitted or in review'],['Your actions',acts(ME0),'Last 30 days']];
+  el.innerHTML='<h2 class="dash-h2">Your performance</h2><div class="kpi-grid">'+k.map(function(x){return '<div class="s-card kpi"><p class="kpi-label">'+x[0]+'</p><p class="kpi-value">'+x[1]+'</p><p class="kpi-sub">'+x[2]+'</p></div>';}).join('')+'</div>'
+   +'<section class="s-card dash-sec"><div class="s-card-head"><h2>Your recent activity</h2></div><ul class="act-list">'+logRows(mine.slice(0,8))+'</ul></section>';
+ }}
+var dh=document.querySelector('.page-head h1');if(dh)dh.textContent=SUPER?'Team dashboard':'My dashboard';
 drawDash();scopeToggle($('scopeSeg'),drawDash);
 }
 
@@ -309,10 +356,14 @@ if(page==='clients'){
   return data.clients.filter(function(c){if(!inScope(c))return false;var apps=data.applications.filter(function(a){return a.clientId===c.id;});var name=S.clientName(c).toLowerCase();
    return (!q||name.indexOf(q)>-1||apps.some(function(a){return a.type.toLowerCase().indexOf(q)>-1;})) && (!st||apps.some(function(a){return a.status===st;})) && (!ty||apps.some(function(a){return a.type===ty;}));});}
  function render(){var list=filtered();var pages=Math.max(1,Math.ceil(list.length/per));if(cur>pages)cur=pages;var slice=list.slice((cur-1)*per,cur*per);
-  $('clientRows').innerHTML=slice.map(function(c){var apps=data.applications.filter(function(a){return a.clientId===c.id;});var act=apps.filter(isActiveApp);return '<tr><td><span class="cell-strong">'+esc(S.clientName(c))+'</span> <span class="muted cell-code">'+esc(S.clientCode(c))+'</span></td><td>'+esc(c.email)+'</td><td>'+esc(c.phone)+'</td><td><span class="assignee'+(c.assignedAdminId===ME?' is-me':'')+'">'+esc(adminLabel(c.assignedAdminId))+'</span></td><td>'+apps.length+(apps.length?'<span class="muted app-act-n">'+act.length+' active</span>':'')+'</td><td>'+(act.length?'<ul class="app-mini">'+act.map(function(x){return '<li>'+esc(S.visaCountry(S.visaFor(data,x)))+' - '+esc(x.type)+' · '+esc(x.status)+'</li>';}).join('')+'</ul>':'<span class="muted">None</span>')+'</td><td class="row-acts"><button type="button" class="icon-btn" data-edit-client="'+c.id+'" aria-label="Edit client '+esc(S.clientName(c))+'" title="Edit client">'+PENCIL+'</button><a class="btn sm msg-btn" href="messages.html?c='+encodeURIComponent(c.id)+'" aria-label="Message '+esc(S.clientName(c))+'">Message</a></td></tr>';}).join('');
+  $('clientRows').innerHTML=slice.map(function(c){var apps=data.applications.filter(function(a){return a.clientId===c.id;});var act=apps.filter(isActiveApp);return '<tr><td><span class="cell-strong">'+esc(S.clientName(c))+'</span> <span class="muted cell-code">'+esc(S.clientCode(c))+'</span></td><td>'+esc(c.email)+'</td><td>'+esc(c.phone)+'</td><td><span class="assignee'+(c.assignedAdminId===ME?' is-me':'')+'">'+esc(adminLabel(c.assignedAdminId))+'</span></td><td>'+apps.length+(apps.length?'<span class="muted app-act-n">'+act.length+' active</span>':'')+'</td><td>'+(act.length?'<ul class="app-mini">'+act.map(function(x){return '<li>'+esc(S.visaCountry(S.visaFor(data,x)))+' - '+esc(x.type)+' · '+esc(x.status)+'</li>';}).join('')+'</ul>':'<span class="muted">None</span>')+'</td><td class="row-acts"><button type="button" class="icon-btn" data-edit-client="'+c.id+'" aria-label="Edit client '+esc(S.clientName(c))+'" title="Edit client">'+PENCIL+'</button>'+(can('clients','delete')?'<button type="button" class="icon-btn danger" data-del-client="'+c.id+'" aria-label="Delete client '+esc(S.clientName(c))+'" title="Delete client">'+TRASH+'</button>':'')+'<a class="btn sm msg-btn" href="messages.html?c='+encodeURIComponent(c.id)+'" aria-label="Message '+esc(S.clientName(c))+'">Message</a></td></tr>';}).join('');
   $('pageInfo').textContent='Page '+cur+' of '+pages+' · '+list.length+' clients';
   $('prevPage').disabled=cur<=1; $('nextPage').disabled=cur>=pages;
-  document.querySelectorAll('[data-edit-client]').forEach(function(b){b.addEventListener('click',function(){openEdit(b.getAttribute('data-edit-client'),b);});});}
+  document.querySelectorAll('[data-edit-client]').forEach(function(b){b.addEventListener('click',function(){openEdit(b.getAttribute('data-edit-client'),b);});});
+  document.querySelectorAll('[data-del-client]').forEach(function(b){b.addEventListener('click',function(){delClient=b.getAttribute('data-del-client');var c=clientById(delClient),n=data.applications.filter(function(a){return a.clientId===delClient;}).length;$('delClientMsg').textContent='Delete '+S.clientName(c)+'? This removes their '+n+' application'+(n===1?'':'s')+', document checklists and messages. This cannot be undone.';openModal('delClientModal',b);});});}
+ var delClient=null;
+ if($('confirmDelClient'))$('confirmDelClient').addEventListener('click',function(){if(!delClient||!can('clients','delete'))return;var c=clientById(delClient),aids=data.applications.filter(function(a){return a.clientId===delClient;}).map(function(a){return a.id;});data.applications=data.applications.filter(function(a){return a.clientId!==delClient;});aids.forEach(function(id){delete data.checklists[id];});if(data.threads)data.threads=data.threads.filter(function(t){return t.clientId!==delClient;});data.clients=data.clients.filter(function(x){return x.id!==delClient;});S.log(data,'Delete','Clients',S.clientName(c),'Deleted client and '+aids.length+' application'+(aids.length===1?'':'s'));S.save(data);delClient=null;closeModal('delClientModal');render();});
+ if(!can('clients','add'))$('addClientBtn').hidden=true;
  onDocsChanged=function(){render();if(editingId)renderEditApps();};
  function docCount(a){return S.ensureChecklist(data,a).filter(function(r){return r.done;}).length;}
  function renderEditApps(){var apps=data.applications.filter(function(a){return a.clientId===editingId;});
@@ -324,7 +375,7 @@ if(page==='clients'){
   S.save(data);
   document.querySelectorAll('#editApps [data-app]').forEach(function(el){function go(){openDocs(el.getAttribute('data-app'),el);}
    el.addEventListener('click',go);el.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go();}});});}
- function openEdit(cid,btn){editingId=cid;var c=clientById(cid);$('editFirst').value=c.first||'';$('editMiddle').value=c.middle||'—';$('editLast').value=c.last||'';$('editEmail').value=c.email;$('editPhone').value=c.phone;$('editClientName').textContent=S.clientName(c);$('editAdmin').innerHTML=adminOptions(c.assignedAdminId);if($('editClientMsg')){$('editClientMsg').href='messages.html?c='+encodeURIComponent(cid);$('editClientMsg').setAttribute('aria-label','Message '+S.clientName(c));}renderEditApps();openModal('editClientModal');if(btn)lastFocus=btn;}
+ function openEdit(cid,btn){editingId=cid;var c=clientById(cid);$('editFirst').value=c.first||'';$('editMiddle').value=c.middle||'—';$('editLast').value=c.last||'';$('editEmail').value=c.email;$('editPhone').value=c.phone;$('editClientName').textContent=S.clientName(c);$('editAdmin').innerHTML=adminOptions(c.assignedAdminId);if($('editClientMsg')){$('editClientMsg').href='messages.html?c='+encodeURIComponent(cid);$('editClientMsg').setAttribute('aria-label','Message '+S.clientName(c));}renderEditApps();var ce=can('clients','edit');$('editClientForm').querySelectorAll('input,select').forEach(function(x){if(x.id!=='editMiddle'&&x.id!=='editFirst'&&x.id!=='editLast')x.disabled=!ce;});var sb=$('editClientForm').querySelector('[type=submit]');if(sb)sb.hidden=!ce;if($('addAppForClient'))$('addAppForClient').hidden=!ce;openModal('editClientModal');if(btn)lastFocus=btn;}
  populateEffective($('newVisaType').value,$('newEffective'));
  $('newVisaType').addEventListener('change',function(){populateEffective($('newVisaType').value,$('newEffective'));});
  $('newAdmin').innerHTML=adminOptions(ME);
@@ -335,51 +386,69 @@ if(page==='clients'){
   $('addClientError').textContent=err; if(err)return;
   var v=selectedVisa($('newEffective'));if(!v){$('addClientError').textContent='Cannot save: a case type with an effective date is needed first. Add one on the Case types page.';return;}
   var c={id:'c-'+Date.now(),first:first,middle:$('newMiddle').value.trim(),last:last,email:email,phone:$('newPhone').value.trim(),address:'',language:'',dob:'',assignedAdminId:$('newAdmin').value||ME,createdAt:S.today(),updatedAt:S.today()};
-  data.clients.push(c);
+  if(!can('clients','add'))return;data.clients.push(c);S.log(data,'Create','Clients',S.clientName(c),'Added client with '+type+' application');
   data.applications.push({id:'a-'+Date.now(),clientId:c.id,type:type,visaId:v.id,effectiveDate:v.effective,status:'New',date:S.today(),createdAt:S.today(),updatedAt:S.today(),progress:0});
   S.save(data); closeModal('addClientModal'); e.target.reset(); if(!inScope(c)){sessionStorage.setItem('isc_scope','all');scopeToggle($('scopeSeg'),function(){cur=1;render();});} cur=1; render();});
- $('editClientForm').addEventListener('submit',function(e){e.preventDefault();var c=clientById(editingId);c.email=$('editEmail').value.trim();c.phone=$('editPhone').value.trim();var na=$('editAdmin').value,moved=na&&na!==c.assignedAdminId;if(na)c.assignedAdminId=na;c.updatedAt=S.today();S.save(data);$('editMsg').textContent=moved?'Saved. Assigned to '+adminLabel(na)+'.':'Details saved.';render();});
+ $('editClientForm').addEventListener('submit',function(e){e.preventDefault();if(!can('clients','edit'))return;var c=clientById(editingId);var o={e:c.email,p:c.phone};c.email=$('editEmail').value.trim();c.phone=$('editPhone').value.trim();var na=$('editAdmin').value,moved=na&&na!==c.assignedAdminId;if(na)c.assignedAdminId=na;c.updatedAt=S.today();var dt=[];if(o.e!==c.email)dt.push('Email updated');if(o.p!==c.phone)dt.push('Phone updated');if(moved)dt.push('Reassigned to '+adminLabel(na));S.log(data,'Edit','Clients',S.clientName(c),dt.join('; ')||'Saved details');S.save(data);$('editMsg').textContent=moved?'Saved. Assigned to '+adminLabel(na)+'.':'Details saved.';render();});
  populateEffective($('editVisaType').value,$('editEffective'));
  $('editVisaType').addEventListener('change',function(){populateEffective($('editVisaType').value,$('editEffective'));$('editAppError').textContent='';});
- $('addAppForClient').addEventListener('click',function(){if(!editingId)return;var v=selectedVisa($('editEffective'));if(!v){$('editAppError').textContent='Cannot add: a case type with an effective date is needed first. Add one on the Case types page.';return;}$('editAppError').textContent='';var a={id:'a-'+Date.now(),clientId:editingId,type:$('editVisaType').value,visaId:v.id,effectiveDate:v.effective,status:'New',date:S.today(),createdAt:S.today(),updatedAt:S.today(),progress:0};data.applications.push(a);S.save(data);renderEditApps();render();$('editMsg').textContent='Added '+a.type+' application.';});
+ $('addAppForClient').addEventListener('click',function(){if(!editingId)return;var v=selectedVisa($('editEffective'));if(!v){$('editAppError').textContent='Cannot add: a case type with an effective date is needed first. Add one on the Case types page.';return;}$('editAppError').textContent='';var a={id:'a-'+Date.now(),clientId:editingId,type:$('editVisaType').value,visaId:v.id,effectiveDate:v.effective,status:'New',date:S.today(),createdAt:S.today(),updatedAt:S.today(),progress:0};data.applications.push(a);S.log(data,'Create','Applications',S.clientName(clientById(editingId)),'Added '+a.type+' application');S.save(data);renderEditApps();render();$('editMsg').textContent='Added '+a.type+' application.';});
  ['search','fStatus','fType'].forEach(function(id){$(id).addEventListener('input',function(){cur=1;render();});});
  scopeToggle($('scopeSeg'),function(){cur=1;render();});
  $('prevPage').addEventListener('click',function(){cur--;render();}); $('nextPage').addEventListener('click',function(){cur++;render();}); render();
- var deep=new URLSearchParams(location.search).get('client');if(deep&&clientById(deep)&&!inScope(clientById(deep))){sessionStorage.setItem('isc_scope','all');scopeToggle($('scopeSeg'),function(){cur=1;render();});render();}
+ var deep=new URLSearchParams(location.search).get('client');if(deep&&clientById(deep)&&!inScope(clientById(deep))&&(SUPER||can('clients','all'))){sessionStorage.setItem('isc_scope','all');scopeToggle($('scopeSeg'),function(){cur=1;render();});render();}
  if(deep&&clientById(deep))setTimeout(function(){openEdit(deep,null);},0);
 }
 
 /* ================= OWNER: documents ================= */
 if(page==='documents'){
- var pendingDelete=null;
+ var pendingDelete=null,editDoc=null,draft=[],repIdx=-1;
+ var canAdd=can('documents','add'),canEdit=can('documents','edit'),canDel=can('documents','delete');
+ if(!canAdd)$('addDocBtn').hidden=true;
+ function filesOf(d){return d.files?d.files:(d.sample?[d.sample]:[]);}
+ function pageMsg(t,bad){var m=$('sampleStatus');m.textContent=t;m.className=bad?'sample-status err':'sample-status';}
+ function attMsg(t,bad){var m=$('attMsg');m.textContent=t;m.className=bad?'att-msg err':'att-msg';}
  function render(){var list=data.documents;
-  $('docRows').innerHTML=list.map(function(d){return '<tr><td>'+esc(d.name)+'</td><td>'+esc(d.version)+'</td><td>'+esc((data.visas||[]).filter(function(v){return v.docIds.indexOf(d.id)>-1;}).map(function(v){return v.name;}).join(', ')||'—')+'</td><td>'+esc(d.status)+'</td><td>'+esc(d.createdAt)+'</td><td>'+esc(d.updatedAt)+'</td><td>'+d.uploaded+'</td><td class="sample-cell">'+(d.sample?'<span class="sample-name">'+esc(d.sample.name)+'</span><span class="muted">'+esc(typeLabel(d.sample.type,d.sample.name))+' · '+esc(fmtSize(d.sample.size))+'</span>':'<span class="muted">No example</span>')+'<span class="sample-actions">'+(d.sample?'<button type="button" class="btn ghost sm" data-sview="'+d.id+'" aria-label="View example for '+esc(d.name)+'">View</button><button type="button" class="btn ghost sm" data-sattach="'+d.id+'" aria-label="Replace example for '+esc(d.name)+'">Replace</button><button type="button" class="btn ghost sm danger" data-sremove="'+d.id+'" aria-label="Remove example for '+esc(d.name)+'">Remove</button>':'<button type="button" class="btn ghost sm" data-sattach="'+d.id+'" aria-label="Attach example for '+esc(d.name)+'">Attach example</button>')+'</span></td><td style="white-space:nowrap"><button type="button" class="icon-btn" data-edit="'+d.id+'" aria-label="Edit document '+esc(d.name)+'" title="Edit document">'+PENCIL+'</button> <button type="button" class="icon-btn danger" data-del="'+d.id+'" aria-label="Delete document '+esc(d.name)+'" title="Delete document">'+TRASH+'</button></td></tr>';}).join('');
-  document.querySelectorAll('[data-edit]').forEach(function(b){b.addEventListener('click',function(){var d=S.docById(data,b.getAttribute('data-edit'));$('docId').value=d.id;$('docName').value=d.name;$('docVersion').value=d.version;$('docStatus').value=d.status;openModal('docModal');lastFocus=b;});});
-  document.querySelectorAll('[data-sattach]').forEach(function(b){b.addEventListener('click',function(){sampleTarget=b.getAttribute('data-sattach');sampleOpener=b;$('sampleFile').value='';$('sampleFile').click();});});
-  document.querySelectorAll('[data-sview]').forEach(function(b){b.addEventListener('click',function(){openSample(S.docById(data,b.getAttribute('data-sview')),b);});});
-  document.querySelectorAll('[data-sremove]').forEach(function(b){b.addEventListener('click',function(){pendingSampleRemove=b.getAttribute('data-sremove');var d=S.docById(data,pendingSampleRemove);$('sampleRemoveMsg').textContent='Remove the example “'+d.sample.name+'” from “'+d.name+'”? Clients will no longer see an example for this requirement.';openModal('sampleRemoveModal',b);});});
-  document.querySelectorAll('[data-del]').forEach(function(b){b.addEventListener('click',function(){pendingDelete=b.getAttribute('data-del');var d=S.docById(data,pendingDelete);$('deleteMsg').textContent='Delete “'+d.name+'”? It will also be removed from any visa required-document lists that use it.';openModal('confirmModal');lastFocus=b;});});}
- var sampleTarget=null,sampleOpener=null,pendingSampleRemove=null;
- function sampleMsg(t,bad){var m=$('sampleStatus');m.textContent=t;m.className=bad?'sample-status err':'sample-status';}
- $('sampleFile').addEventListener('change',function(){var f=$('sampleFile').files[0],d=S.docById(data,sampleTarget);if(!f||!d)return;
-  if(f.size>S.SAMPLE_MAX){sampleMsg('“'+f.name+'” is '+fmtSize(f.size)+'. Examples can be at most '+fmtSize(S.SAMPLE_MAX)+' — please choose a smaller file.',true);if(sampleOpener)sampleOpener.focus();return;}
-  var rd=new FileReader();rd.onerror=function(){sampleMsg('Could not read “'+f.name+'”.',true);};
-  rd.onload=function(){var prev=d.sample,had=!!prev;d.sample={name:f.name,type:f.type||'',size:f.size,dataUrl:String(rd.result),addedAt:S.today()};d.updatedAt=S.today();
-   if(!S.trySave(data)){d.sample=prev;sampleMsg('Browser storage is full, so “'+f.name+'” could not be saved. Remove another example or use a smaller file.',true);if(sampleOpener)sampleOpener.focus();return;}
-   sampleMsg((had?'Replaced example for ':'Attached example to ')+'“'+d.name+'”: '+f.name+' ('+fmtSize(f.size)+').');var id=d.id;render();var nb=document.querySelector('[data-sattach="'+id+'"]');if(nb)nb.focus();};
-  rd.readAsDataURL(f);});
- $('confirmSampleRemove').addEventListener('click',function(){var d=S.docById(data,pendingSampleRemove);if(!d)return;var nm=d.sample&&d.sample.name;delete d.sample;d.updatedAt=S.today();S.save(data);var id=d.id;pendingSampleRemove=null;
-  $('sampleRemoveModal').hidden=true;modalStack=modalStack.filter(function(x){return x.id!=='sampleRemoveModal';});render();sampleMsg('Removed example '+nm+' from “'+d.name+'”.');var nb=document.querySelector('[data-sattach="'+id+'"]');if(nb)nb.focus();});
- $('confirmDelete').addEventListener('click',function(){if(!pendingDelete)return;data.documents=data.documents.filter(function(d){return d.id!==pendingDelete;});data.visas.forEach(function(v){v.docIds=v.docIds.filter(function(id){return id!==pendingDelete;});v.updatedAt=S.today();});pendingDelete=null;S.save(data);closeModal('confirmModal');render();});
- $('addDocBtn').addEventListener('click',function(){$('docForm').reset();$('docId').value='';openModal('docModal');});
- $('docForm').addEventListener('submit',function(e){e.preventDefault();var today=S.today();var id=$('docId').value;
-  if(id){var d=S.docById(data,id);d.name=$('docName').value;delete d.type;delete d.applicationType;d.version=$('docVersion').value;d.status=$('docStatus').value;d.updatedAt=today;$('docMsg').textContent='Updated document.';}
-  else{data.documents.push({id:'d-'+Date.now(),name:$('docName').value,version:$('docVersion').value||'v1.0',status:$('docStatus').value,createdAt:today,updatedAt:today,uploaded:0});$('docMsg').textContent='Added document.';}
-  S.save(data);closeModal('docModal');render();});
+  $('docRows').innerHTML=list.map(function(d){var fs=filesOf(d);return '<tr><td><span class="cell-strong">'+esc(d.name)+'</span></td><td>'+esc(d.version)+'</td><td>'+esc(d.status)+'</td><td>'+(fs.length?'<span class="att-count">'+fs.length+' file'+(fs.length===1?'':'s')+'</span><span class="muted att-first">'+esc(fs[0].name)+(fs.length>1?' +'+(fs.length-1)+' more':'')+'</span>':'<span class="muted">None</span>')+'</td><td>'+esc(d.createdAt)+'</td><td>'+esc(d.updatedAt)+'</td><td>'+d.uploaded+'</td><td class="row-acts">'
+   +(canEdit?'<button type="button" class="icon-btn" data-edit="'+d.id+'" aria-label="Edit document '+esc(d.name)+'" title="Edit document">'+PENCIL+'</button>':'')
+   +(canDel?'<button type="button" class="icon-btn danger" data-del="'+d.id+'" aria-label="Delete document '+esc(d.name)+'" title="Delete document">'+TRASH+'</button>':'')
+   +(!canEdit&&!canDel?'<span class="muted">—</span>':'')+'</td></tr>';}).join('');
+  document.querySelectorAll('[data-edit]').forEach(function(b){b.addEventListener('click',function(){openDoc(b.getAttribute('data-edit'),b);});});
+  document.querySelectorAll('[data-del]').forEach(function(b){b.addEventListener('click',function(){if(!can('documents','delete'))return;pendingDelete=b.getAttribute('data-del');var d=S.docById(data,pendingDelete);var n=(data.visas||[]).filter(function(v){return v.docIds.indexOf(d.id)>-1;}).length;$('deleteMsg').textContent='Delete “'+d.name+'” and its '+filesOf(d).length+' attached file'+(filesOf(d).length===1?'':'s')+'? '+(n?'It will also be removed from '+n+' case type'+(n===1?'':'s')+' that require it.':'No case types require it.')+' This cannot be undone.';openModal('confirmModal',b);});});}
+ function openDoc(id,opener){editDoc=id?S.docById(data,id):null;$('docForm').reset();$('docId').value=id||'';$('docTitle').textContent=editDoc?'Edit document':'Add document';
+  if(editDoc){$('docName').value=editDoc.name;$('docVersion').value=editDoc.version;$('docStatus').value=editDoc.status;}
+  draft=JSON.parse(JSON.stringify(editDoc?filesOf(editDoc):[]));$('docMsg').textContent='';attMsg('');renderAtt();openModal('docModal',opener);}
+ function renderAtt(){
+  $('attList').innerHTML=draft.length?draft.map(function(f,i){return '<li class="att-row"><div class="att-main"><label class="sr-only" for="attName'+i+'">File name</label><input id="attName'+i+'" class="att-name" data-aname="'+i+'" value="'+esc(f.name)+'"><span class="muted att-meta">'+esc(typeLabel(f.type||'',f.name))+' · '+esc(fmtSize(f.size))+(f.addedAt?' · Added '+esc(f.addedAt):'')+'</span></div><div class="att-acts">'
+   +(f.dataUrl?'<button type="button" class="btn ghost sm" data-aview="'+i+'" aria-label="View '+esc(f.name)+'">View</button>':'')
+   +'<button type="button" class="btn ghost sm" data-arep="'+i+'" aria-label="Replace '+esc(f.name)+'">Replace</button><button type="button" class="icon-btn danger" data-adel="'+i+'" aria-label="Delete '+esc(f.name)+'" title="Delete file">'+TRASH+'</button></div></li>';}).join(''):'<li class="muted att-empty">No files attached yet.</li>';
+  $('attList').querySelectorAll('[data-aname]').forEach(function(inp){inp.addEventListener('input',function(){draft[+inp.getAttribute('data-aname')].name=inp.value;});});
+  $('attList').querySelectorAll('[data-aview]').forEach(function(b){b.addEventListener('click',function(){openSample({name:$('docName').value||'Document',sample:draft[+b.getAttribute('data-aview')]},b);});});
+  $('attList').querySelectorAll('[data-arep]').forEach(function(b){b.addEventListener('click',function(){repIdx=+b.getAttribute('data-arep');var fi=$('sampleFile');fi.multiple=false;fi.value='';fi.click();});});
+  $('attList').querySelectorAll('[data-adel]').forEach(function(b){b.addEventListener('click',function(){var i=+b.getAttribute('data-adel'),f=draft.splice(i,1)[0];renderAtt();attMsg('Removed '+f.name+'. Save the document to apply.');var nx=$('attList').querySelector('[data-adel]')||$('attAdd');nx.focus();});});}
+ $('attAdd').addEventListener('click',function(){repIdx=-1;var fi=$('sampleFile');fi.multiple=true;fi.value='';fi.click();});
+ $('sampleFile').addEventListener('change',function(){var files=[].slice.call($('sampleFile').files||[]);if(!files.length)return;var ok=[],bad=[];
+  files.forEach(function(f){if(f.size>S.SAMPLE_MAX)bad.push(f.name);else ok.push(f);});
+  var left=ok.length,names=[];if(!left){attMsg(bad.join(', ')+' '+(bad.length===1?'is':'are')+' larger than '+fmtSize(S.SAMPLE_MAX)+'. Choose a smaller file.',true);return;}
+  ok.forEach(function(f){var rd=new FileReader();rd.onload=function(){var rec={name:f.name,type:f.type||'',size:f.size,dataUrl:String(rd.result),addedAt:S.today()};
+   if(repIdx>-1&&draft[repIdx]){draft[repIdx]=rec;}else draft.push(rec);names.push(f.name);if(--left===0){var was=repIdx>-1;renderAtt();attMsg((was?'Replaced with ':'Added ')+names.join(', ')+'. Save the document to apply.'+(bad.length?' Skipped '+bad.join(', ')+' (over '+fmtSize(S.SAMPLE_MAX)+').':''),!!bad.length);repIdx=-1;}};
+   rd.onerror=function(){attMsg('Could not read “'+f.name+'”.',true);};rd.readAsDataURL(f);});});
+ $('confirmDelete').addEventListener('click',function(){if(!pendingDelete||!can('documents','delete'))return;var d=S.docById(data,pendingDelete);data.documents=data.documents.filter(function(x){return x.id!==pendingDelete;});data.visas.forEach(function(v){if(v.docIds.indexOf(pendingDelete)>-1){v.docIds=v.docIds.filter(function(id){return id!==pendingDelete;});v.updatedAt=S.today();}});pendingDelete=null;S.log(data,'Delete','Documents',d?d.name:'Document','Deleted document');S.save(data);closeModal('confirmModal');render();pageMsg('Deleted '+(d?d.name:'document')+'.');});
+ $('addDocBtn').addEventListener('click',function(b){openDoc(null,$('addDocBtn'));});
+ $('docForm').addEventListener('submit',function(e){e.preventDefault();var today=S.today();var id=$('docId').value,name=$('docName').value.trim();
+  if(!name){$('docMsg').textContent='Document name is required.';$('docName').focus();return;}
+  if(id?!can('documents','edit'):!can('documents','add')){$('docMsg').textContent='You don’t have permission to do this.';return;}
+  var empty=draft.filter(function(f){return !String(f.name||'').trim();});if(empty.length){attMsg('Every file needs a name.',true);return;}
+  draft.forEach(function(f){f.name=f.name.trim();});
+  var d,prev=null,isNew=!id;if(id){d=S.docById(data,id);prev=JSON.stringify({n:d.name,v:d.version,s:d.status,f:filesOf(d),sm:d.sample});}else{d={id:'d-'+Date.now(),createdAt:today,uploaded:0};data.documents.push(d);}
+  var before=prev?JSON.parse(prev):null;
+  d.name=name;delete d.type;delete d.applicationType;d.version=$('docVersion').value.trim()||'v1.0';d.status=$('docStatus').value;d.files=draft.slice();if(draft.length)d.sample=draft[0];else delete d.sample;d.updatedAt=today;
+  var det=[];if(before){if(before.n!==d.name)det.push('Renamed from “'+before.n+'”');if(before.v!==d.version)det.push('Version '+before.v+' → '+d.version);if(before.s!==d.status)det.push('Status '+before.s+' → '+d.status);if(JSON.stringify(before.f.map(function(f){return f.name+f.size;}))!==JSON.stringify(d.files.map(function(f){return f.name+f.size;})))det.push('Attachments updated ('+d.files.length+' file'+(d.files.length===1?'':'s')+')');}
+  S.log(data,isNew?'Create':'Edit','Documents',d.name,isNew?'Added document'+(d.files.length?' with '+d.files.length+' file'+(d.files.length===1?'':'s'):''):(det.join('; ')||'Saved without changes'));
+  if(!S.trySave(data)){if(isNew)data.documents=data.documents.filter(function(x){return x!==d;});else{d.name=before.n;d.version=before.v;d.status=before.s;d.files=before.f;if(before.sm)d.sample=before.sm;else delete d.sample;}data.logs.pop();attMsg('Browser storage is full, so the files could not be saved. Remove a file or use a smaller one.',true);return;}
+  closeModal('docModal');render();pageMsg((isNew?'Added ':'Saved ')+d.name+'.');});
  render();
 }
-
-/* ================= OWNER: visas ================= */
 if(page==='visas'){
  var editingVisa=null, selAvail=new Set(), selReq=new Set();
  function dualList(el,docs,selected,onToggle){$(el).innerHTML=docs.length?docs.map(function(d){return '<li tabindex="0" role="option" aria-selected="'+(selected.has(d.id)?'true':'false')+'" data-doc="'+d.id+'">'+esc(d.name)+'</li>';}).join(''):'<li aria-disabled="true">None</li>';
@@ -396,13 +465,68 @@ if(page==='visas'){
  $('moveRight').addEventListener('click',function(){move(true);}); $('moveLeft').addEventListener('click',function(){move(false);});
  function render(){/* Display-only sort: effective date DESC (newest first); missing/invalid dates last; stable via original index. Stored order in data.visas is NOT mutated, so dropdowns elsewhere keep their order. */
   var sorted=data.visas.map(function(v,i){return {v:v,i:i};}).sort(function(a,b){var ta=Date.parse(a.v.effective),tb=Date.parse(b.v.effective);var va=!isNaN(ta),vb=!isNaN(tb);if(va&&vb)return (tb-ta)||(a.i-b.i);if(va)return -1;if(vb)return 1;return a.i-b.i;}).map(function(x){return x.v;});
-  $('visaRows').innerHTML=sorted.map(function(v){return '<tr><td><strong>'+esc(v.name)+'</strong></td><td>'+esc(S.visaCountry(v))+'</td><td>'+esc(v.effective)+'</td><td>'+esc(v.notes)+'</td><td>'+v.docIds.length+'</td><td>'+esc(v.createdAt)+'</td><td>'+esc(v.updatedAt)+'</td><td><button type="button" class="icon-btn" data-edit-visa="'+v.id+'" aria-label="Edit visa '+esc(v.name)+'" title="Edit visa">'+PENCIL+'</button></td></tr>';}).join('');
+  $('visaRows').innerHTML=sorted.map(function(v){return '<tr><td><strong>'+esc(v.name)+'</strong></td><td>'+esc(S.visaCountry(v))+'</td><td>'+esc(v.effective)+'</td><td>'+esc(v.notes)+'</td><td>'+v.docIds.length+'</td><td>'+esc(v.createdAt)+'</td><td>'+esc(v.updatedAt)+'</td><td class="row-acts">'+(can('casetypes','edit')?'<button type="button" class="icon-btn" data-edit-visa="'+v.id+'" aria-label="Edit case type '+esc(v.name)+'" title="Edit case type">'+PENCIL+'</button>':'')+(can('casetypes','delete')?'<button type="button" class="icon-btn danger" data-del-visa="'+v.id+'" aria-label="Delete case type '+esc(v.name)+'" title="Delete case type">'+TRASH+'</button>':'')+'</td></tr>';}).join('');
+  document.querySelectorAll('[data-del-visa]').forEach(function(b){b.addEventListener('click',function(){var v=data.visas.find(function(x){return x.id===b.getAttribute('data-del-visa');});var used=data.applications.filter(function(a){return S.visaFor(data,a)===v;}).length;delVisa=used?null:v.id;$('delVisaMsg').textContent=used?'“'+v.name+'” is used by '+used+' application'+(used===1?'':'s')+', so it can’t be deleted. Move or remove those applications first.':'Delete “'+v.name+'” ('+S.visaCountry(v)+')? Its document checklist will be removed. This cannot be undone.';$('confirmDelVisa').hidden=!!used;openModal('delVisaModal',b);});});
   document.querySelectorAll('[data-edit-visa]').forEach(function(b){b.addEventListener('click',function(){editingVisa=b.getAttribute('data-edit-visa');var v=data.visas.find(function(x){return x.id===editingVisa;});$('visaName').value=v.name;$('visaCountry').value=S.visaCountry(v);$('visaDate').value=v.effective;$('visaNotes').value=v.notes;pickerChosen=v.docIds.slice();selAvail.clear();selReq.clear();renderPicker();openModal('visaModal');lastFocus=b;});});}
- $('addVisaBtn').addEventListener('click',function(){editingVisa=null;$('visaForm').reset();pickerChosen=[];selAvail.clear();selReq.clear();renderPicker();openModal('visaModal');});
+ var delVisa=null;
+ if(!can('casetypes','add'))$('addVisaBtn').hidden=true;
+ $('confirmDelVisa').addEventListener('click',function(){if(!delVisa||!can('casetypes','delete'))return;var v=data.visas.find(function(x){return x.id===delVisa;});data.visas=data.visas.filter(function(x){return x.id!==delVisa;});S.log(data,'Delete','Case types',v.name,'Deleted case type ('+S.visaCountry(v)+')');S.save(data);delVisa=null;closeModal('delVisaModal');render();});
+ $('addVisaBtn').addEventListener('click',function(){if(!can('casetypes','add'))return;editingVisa=null;$('visaForm').reset();pickerChosen=[];selAvail.clear();selReq.clear();renderPicker();openModal('visaModal');});
  $('visaForm').addEventListener('submit',function(e){e.preventDefault();var name=$('visaName').value.trim();if(!name){$('visaMsg').textContent='Case type is required.';return;}var country=$('visaCountry').value;if(!country){$('visaMsg').textContent='Country is required.';$('visaCountry').focus();return;}
-  if(editingVisa){var v=data.visas.find(function(x){return x.id===editingVisa;});v.name=name;v.country=country;v.effective=$('visaDate').value;v.notes=$('visaNotes').value;v.docIds=pickerChosen.slice();v.updatedAt=S.today();}
-  else{data.visas.push({id:'v-'+Date.now(),name:name,country:country,effective:$('visaDate').value,notes:$('visaNotes').value,docIds:pickerChosen.slice(),createdAt:S.today(),updatedAt:S.today()});}
+  if(editingVisa?!can('casetypes','edit'):!can('casetypes','add')){$('visaMsg').textContent='You don’t have permission to do this.';return;}
+  if(editingVisa){var v=data.visas.find(function(x){return x.id===editingVisa;});S.log(data,'Edit','Case types',name,v.name!==name?'Renamed from “'+v.name+'”':'Updated details and required documents');v.name=name;v.country=country;v.effective=$('visaDate').value;v.notes=$('visaNotes').value;v.docIds=pickerChosen.slice();v.updatedAt=S.today();}
+  else{S.log(data,'Create','Case types',name,'Added case type ('+country+')');data.visas.push({id:'v-'+Date.now(),name:name,country:country,effective:$('visaDate').value,notes:$('visaNotes').value,docIds:pickerChosen.slice(),createdAt:S.today(),updatedAt:S.today()});}
   S.save(data);closeModal('visaModal');render();});
  renderPicker(); render();
+}
+if(page==='logs'){
+ var LPER=25,lpg=1,ACTS=['Login','Logout','Create','Edit','Delete','Status change','Upload','Permission change'];
+ var users={};(data.logs||[]).forEach(function(l){users[l.actorId]=l.actor;});
+ $('logUser').innerHTML='<option value="">All users</option>'+Object.keys(users).sort(function(a,b){return users[a]<users[b]?-1:1;}).map(function(k){return '<option value="'+esc(k)+'">'+esc(users[k])+'</option>';}).join('');
+ $('logAction').innerHTML='<option value="">All actions</option>'+ACTS.map(function(a){return '<option>'+a+'</option>';}).join('');
+ var areas={};(data.logs||[]).forEach(function(l){areas[l.area]=1;});
+ $('logArea').innerHTML='<option value="">All areas</option>'+Object.keys(areas).sort().map(function(a){return '<option>'+esc(a)+'</option>';}).join('');
+ function dkey(iso){var d=new Date(iso);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+ function lrender(){var q=$('logQ').value.trim().toLowerCase(),u=$('logUser').value,ac=$('logAction').value,ar=$('logArea').value,fr=$('logFrom').value,to=$('logTo').value;
+  var list=(data.logs||[]).filter(function(l){var k=dkey(l.at);return (!u||l.actorId===u)&&(!ac||l.action===ac)&&(!ar||l.area===ar)&&(!fr||k>=fr)&&(!to||k<=to)&&(!q||(l.actor+' '+l.target+' '+l.detail+' '+l.action).toLowerCase().indexOf(q)>-1);}).sort(function(a,b){return a.at<b.at?1:a.at>b.at?-1:0;});
+  var pages=Math.max(1,Math.ceil(list.length/LPER));if(lpg>pages)lpg=pages;var st=(lpg-1)*LPER;
+  $('logRows').innerHTML=list.slice(st,st+LPER).map(function(l){return '<tr><td class="log-when">'+esc(new Date(l.at).toLocaleString(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}))+'</td><td><span class="cell-strong">'+esc(l.actor)+'</span><span class="muted log-role">'+esc(l.role)+'</span></td><td><span class="log-act act-'+esc(l.action.toLowerCase().replace(/\s+/g,'-'))+'">'+esc(l.action)+'</span></td><td>'+esc(l.area)+'</td><td>'+esc(l.target)+'</td><td class="muted">'+esc(l.detail)+'</td></tr>';}).join('')||'<tr><td colspan="6" class="muted">No activity matches these filters.</td></tr>';
+  $('logInfo').textContent=list.length?'Showing '+(st+1)+'–'+Math.min(st+LPER,list.length)+' of '+list.length+' entries':'0 entries';
+  var h='<button type="button" class="btn ghost sm" data-lp="prev" '+(lpg===1?'disabled':'')+'>‹ Previous</button><span class="pg-of">Page '+lpg+' of '+pages+'</span><button type="button" class="btn ghost sm" data-lp="next" '+(lpg===pages?'disabled':'')+'>Next ›</button>';
+  $('logPager').innerHTML=h;$('logPager').querySelectorAll('[data-lp]').forEach(function(b){b.addEventListener('click',function(){lpg+=b.getAttribute('data-lp')==='next'?1:-1;lrender();});});}
+ ['logQ','logUser','logAction','logArea','logFrom','logTo'].forEach(function(id){$(id).addEventListener(id==='logQ'?'input':'change',function(){lpg=1;lrender();});});
+ $('logReset').addEventListener('click',function(){['logQ','logUser','logAction','logArea','logFrom','logTo'].forEach(function(id){$(id).value='';});lpg=1;lrender();});
+ lrender();
+}
+if(page==='permissions'){
+ var AR={};S.AREAS.forEach(function(a){AR[a.k]=a;});
+ var editU=null;
+ function summary(a){if(a.role==='super')return 'Full access';var p=data.perms[a.id]||{};return Object.keys(AR).filter(function(k){return p[k]&&p[k].view;}).map(function(k){return AR[k].label;}).join(', ')||'No access';}
+ function prender(){$('permRows').innerHTML=data.admins.map(function(a){return '<tr><td><span class="cell-strong">'+esc(S.adminName(a))+'</span>'+(a.id===ME0?' <span class="muted">(you)</span>':'')+'</td><td>'+esc(a.email||'')+'</td><td><span class="role-pill '+a.role+'">'+esc(S.ROLE_LABEL[a.role])+'</span></td><td class="muted">'+esc(summary(a))+'</td><td>'+data.clients.filter(function(c){return c.assignedAdminId===a.id;}).length+'</td><td class="row-acts"><button type="button" class="icon-btn" data-pedit="'+a.id+'" aria-label="Edit permissions for '+esc(S.adminName(a))+'" title="Edit permissions">'+PENCIL+'</button></td></tr>';}).join('');
+  document.querySelectorAll('[data-pedit]').forEach(function(b){b.addEventListener('click',function(){openU(b.getAttribute('data-pedit'),b);});});}
+ function matrix(role,p){var all=[];Object.keys(AR).forEach(function(k){AR[k].acts.forEach(function(x){if(all.indexOf(x)<0)all.push(x);});});
+  $('permHead').innerHTML='<tr><th>Area</th>'+all.map(function(x){return '<th class="num">'+esc(S.ACT_LABEL[x])+'</th>';}).join('')+'</tr>';
+  $('permMatrix').innerHTML=Object.keys(AR).map(function(k){var ar=AR[k];return '<tr><th scope="row">'+esc(ar.label)+'</th>'+all.map(function(x){if(ar.acts.indexOf(x)<0)return '<td class="num muted">—</td>';var on=role==='super'||(p[k]&&p[k][x]);return '<td class="num"><label class="tgl"><input type="checkbox" data-pa="'+k+'" data-px="'+x+'"'+(on?' checked':'')+(role==='super'?' disabled':'')+' aria-label="'+esc(ar.label+': '+S.ACT_LABEL[x])+'"><span aria-hidden="true"></span></label></td>';}).join('')+'</tr>';}).join('');
+  $('permNote').textContent=role==='super'?'Super Admins always have full access to every area.':'Changes apply the next time this user opens a page.';}
+ function openU(id,opener){editU=id?S.adminById(data,id):null;$('permForm').reset();$('permMsg').textContent='';$('permTitle').textContent=editU?'Edit '+S.adminName(editU):'Add user';
+  $('pFirst').value=editU?editU.first:'';$('pLast').value=editU?editU.last:'';$('pEmail').value=editU?editU.email||'':'';$('pRole').value=editU?editU.role:'staff';$('pRole').disabled=!!(editU&&editU.id===ME0);$('pRoleNote').hidden=!(editU&&editU.id===ME0);
+  matrix($('pRole').value,editU?data.perms[editU.id]||{}:S.roleDefaults('staff'));openModal('permModal',opener);}
+ $('pRole').addEventListener('change',function(){matrix($('pRole').value,S.roleDefaults($('pRole').value));});
+ $('addUserBtn').addEventListener('click',function(){openU(null,$('addUserBtn'));});
+ $('permForm').addEventListener('submit',function(e){e.preventDefault();if(!SUPER)return;var f=$('pFirst').value.trim(),l=$('pLast').value.trim(),em=$('pEmail').value.trim().toLowerCase(),role=$('pRole').value;
+  if(!f||!l||!em){$('permMsg').textContent='First name, last name and email are required.';return;}
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){$('permMsg').textContent='Enter a valid email address.';$('pEmail').focus();return;}
+  if(data.admins.some(function(a){return a!==editU&&String(a.email||'').toLowerCase()===em;})){$('permMsg').textContent='Another user already has this email.';return;}
+  var p={};Object.keys(AR).forEach(function(k){p[k]={};AR[k].acts.forEach(function(x){p[k][x]=false;});});
+  $('permMatrix').querySelectorAll('[data-pa]').forEach(function(c){p[c.getAttribute('data-pa')][c.getAttribute('data-px')]=c.checked;});
+  if(role==='super')p=S.roleDefaults('super');
+  if(role==='staff'&&editU&&editU.role==='super'&&data.admins.filter(function(a){return a.role==='super';}).length<2){$('permMsg').textContent='At least one Super Admin is required.';return;}
+  var isNew=!editU,u=editU||{id:'adm-'+Date.now()};var before=editU?JSON.stringify({r:editU.role,p:data.perms[editU.id]}):'';
+  u.first=f;u.last=l;u.email=em;u.role=role;if(isNew)data.admins.push(u);data.perms[u.id]=p;
+  if(role==='super')data.clients.forEach(function(c){if(c.assignedAdminId===u.id){var sl=S.staffList(data);if(sl.length)c.assignedAdminId=sl[0].id;}});
+  var changed=!before||before!==JSON.stringify({r:u.role,p:p});
+  S.log(data,isNew?'Create':'Permission change','Permissions',S.adminName(u),isNew?'Added '+S.ROLE_LABEL[role]+' user':(changed?'Role: '+S.ROLE_LABEL[role]+'; access: '+summary(u):'Updated details'));
+  S.save(data);closeModal('permModal');prender();$('permStatus').textContent=(isNew?'Added ':'Saved ')+S.adminName(u)+'.';});
+ prender();
 }
 })();

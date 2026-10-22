@@ -1,0 +1,19 @@
+<!doctype html><html lang="en-CA"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Permissions | ISConnect portal</title>
+<link rel="icon" href="../favicon.ico"><link rel="apple-touch-icon" href="../assets/brand/apple-touch-icon.png"><meta name="theme-color" content="#0b1626"><link rel="stylesheet" href="../assets/portal/dashboard.css?v=20261022c">
+<script>(function(){var r=sessionStorage.getItem('isc_demo_role');if(r!=='owner'||!sessionStorage.getItem('isc_demo_admin')){location.replace('../login.html');}})();</script>
+</head><body data-page="permissions" data-role="owner">
+<div class="topbar"><img src="../assets/brand/logo-white-220.webp?v=20261022c" srcset="../assets/brand/logo-white-220.webp?v=20261022c 1x, ../assets/brand/logo-white-440.webp?v=20261022c 2x" alt="International Students Connect" width="150" height="45"><button class="btn" type="button" data-menu aria-expanded="false" aria-controls="sideNav">☰ Menu</button></div>
+<div class="dash"><aside class="side" id="sideNav"><img src="../assets/brand/logo-white-440.webp?v=20261022c" alt="International Students Connect" width="200" height="60"><p>Signed in as<br><strong data-admin-name>Admin</strong></p><nav aria-label="Dashboard"><a href="dashboard.html">Dashboard</a><a href="clients.html">Clients</a><a href="documents.html">Documents</a><a href="visas.html">Case types</a><a href="messages.html" class="nav-msg">Messages <span class="nav-badge" id="navMsgBadge" hidden></span></a><a href="../index.html">View public site</a><a href="#" data-signout>Sign out</a></nav></aside>
+<main class="main" id="main"><h1>Permissions</h1>
+<p class="muted">Assign each user a role and choose which areas Staff can open and change. Super Admins always have full access.</p>
+<p><button class="btn navy" id="addUserBtn" type="button">＋ Add user</button></p><p id="permStatus" class="sample-status" role="status" aria-live="polite"></p>
+<div class="tablewrap" style="margin-top:12px"><table><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Access</th><th>Clients</th><th>Actions</th></tr></thead><tbody id="permRows"></tbody></table></div>
+<div class="modal-back" id="permModal" hidden><div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="permTitle">
+<h2 id="permTitle">Edit user</h2><form id="permForm"><div class="perm-grid"><div><label for="pFirst">First name</label><input id="pFirst" required></div><div><label for="pLast">Last name</label><input id="pLast" required></div><div><label for="pEmail">Email</label><input id="pEmail" type="email" required></div><div><label for="pRole">Role</label><select id="pRole"><option value="super">Super Admin</option><option value="staff">Staff</option></select><p class="muted perm-note" id="pRoleNote" hidden>You can’t change your own role.</p></div></div>
+<h3 class="perm-h3">Access</h3><p class="muted perm-note" id="permNote"></p>
+<div class="tablewrap"><table class="perm-table"><thead id="permHead"></thead><tbody id="permMatrix"></tbody></table></div>
+<p id="permMsg" role="status" aria-live="polite"></p>
+<div class="actions"><button class="btn navy" type="submit">Save</button><button class="btn ghost" type="button" data-close="permModal">Cancel</button></div></form></div></div>
+<footer class="mini-footer"><p class="policy-links"><a href="../privacy.html">Privacy Policy</a><span class="sep" aria-hidden="true">|</span><a href="../cookies.html">Cookies Policy</a></p><p class="mini-disc">Concept site, not affiliated with or approved by International Students Connect.</p></footer></main></div>
+<script src="../assets/portal/sample-seeds.js?v=20261022c"></script><script src="../assets/portal/portal-data.js?v=20261022c"></script><script src="../assets/portal/portal.js?v=20261022c"></script><script src="../assets/portal/messages.js?v=20261022c"></script></body></html>

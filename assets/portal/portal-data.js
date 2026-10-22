@@ -67,13 +67,57 @@ function seed(){
   apps.push({id:'a-s'+j,clientId:'c'+j,type:vname(vid),visaId:vid,effectiveDate:'2026-01-01',status:stats[j%stats.length],date:dt,due:(j%4===0?'2026-09-':'2026-12-')+String((j%27)+1).padStart(2,'0'),createdAt:dt,updatedAt:dt,progress:[20,45,60,80,35,90,100,55][j%8]});}
  return {version:1,admins:ADMINS.slice(),clients:clients,applications:apps,checklists:{},
   tasks:tasksSeed(),announcements:announcementsSeed(),documents:docsSeed(),visas:vs,copyV:1,emailsV:1};}
-function load(){try{var raw=localStorage.getItem(KEY);if(raw){var d=JSON.parse(raw);if(d&&d.version===1){var ch=false;if(migrateDocs(d))ch=true;if(migrateMetrics(d))ch=true;if(migrateSamples(d))ch=true;if(migrateNames(d))ch=true;if(migrateAll(d))ch=true;if(migrateAdmins(d))ch=true;if(ensureAssignments(d))ch=true;if(ch)save(d);return d;}}}catch(e){}
- var s=seed();migrateDocs(s);migrateMetrics(s);migrateSamples(s);migrateNames(s);migrateAll(s);migrateAdmins(s);save(s);return s;}
+function load(){try{var raw=localStorage.getItem(KEY);if(raw){var d=JSON.parse(raw);if(d&&d.version===1){var ch=false;if(migrateDocs(d))ch=true;if(migrateMetrics(d))ch=true;if(migrateSamples(d))ch=true;if(migrateNames(d))ch=true;if(migrateAll(d))ch=true;if(migrateAdmins(d))ch=true;if(migrateRoles(d))ch=true;if(ensureAssignments(d))ch=true;if(ch)save(d);return d;}}}catch(e){}
+ var s=seed();migrateDocs(s);migrateMetrics(s);migrateSamples(s);migrateNames(s);migrateAll(s);migrateAdmins(s);migrateRoles(s);save(s);return s;}
 function save(d){try{ensureAssignments(d);mergeThreads(d);localStorage.setItem(KEY,JSON.stringify(d));return true;}catch(e){if(window.console)console.warn('ISConnect: could not save (storage full?)');return false;}}
 function reset(){localStorage.removeItem(KEY);return load();}
 /* adminsV:1 — guarantees data.admins and a valid assignedAdminId on every client (new clients default to the admin who adds them). */
 function migrateAdmins(d){var ch=false;if(!Array.isArray(d.admins)||!d.admins.length){d.admins=ADMINS.slice();ch=true;}
  (d.clients||[]).forEach(function(c,i){if(!c.assignedAdminId||!d.admins.some(function(a){return a.id===c.assignedAdminId;})){c.assignedAdminId=d.admins[i%d.admins.length].id;ch=true;}});return ch;}
+/* rbacV:1 — Roles (super | staff), per-user permissions (d.perms[adminId][area][action]) and the activity log (d.logs, newest last).
+   Super Admins always hold every permission; Staff permissions come from role defaults and can be changed on the Permissions page. */
+var SUPER_ADMIN={id:'adm-0',first:'Emmanuel',last:'Garcia',email:'superadmin@isconnect.ca',role:'super'};
+var AREAS=[{k:'dashboard',label:'Dashboard',acts:['view']},{k:'clients',label:'Clients',acts:['view','all','add','edit','delete']},{k:'documents',label:'Documents',acts:['view','add','edit','delete']},{k:'casetypes',label:'Case types',acts:['view','add','edit','delete']},{k:'messages',label:'Messages',acts:['view']},{k:'logs',label:'Activity logs',acts:['view']}];
+var ACT_LABEL={view:'View',all:'All clients',add:'Add',edit:'Edit',delete:'Delete'};
+var ROLE_LABEL={super:'Super Admin',staff:'Staff'};
+function roleDefaults(role){var p={};AREAS.forEach(function(a){p[a.k]={};a.acts.forEach(function(x){p[a.k][x]=role==='super';});});
+ if(role!=='super'){p.dashboard.view=true;p.clients.view=p.clients.add=p.clients.edit=true;p.documents.view=p.documents.add=p.documents.edit=p.documents.delete=true;p.casetypes.view=p.casetypes.add=p.casetypes.edit=true;p.messages.view=true;}
+ return p;}
+function staffList(d){return (d.admins||[]).filter(function(a){return a.role!=='super';});}
+function migrateRoles(d){var ch=false;if(!Array.isArray(d.admins))d.admins=[];d.admins.forEach(function(x){if(x.id==='adm-0'&&x.first==='Isabel'&&x.last==='Ramirez'){x.first=SUPER_ADMIN.first;x.last=SUPER_ADMIN.last;ch=true;}});(d.logs||[]).forEach(function(l){if(l.actor==='Isabel Ramirez'){l.actor='Emmanuel Garcia';ch=true;}if(l.target==='Isabel Ramirez'){l.target='Emmanuel Garcia';ch=true;}});
+ if(!d.admins.some(function(a){return a.id===SUPER_ADMIN.id;})){d.admins.unshift(JSON.parse(JSON.stringify(SUPER_ADMIN)));ch=true;}
+ d.admins.forEach(function(a){if(!a.role){a.role=a.id===SUPER_ADMIN.id?'super':'staff';ch=true;}});
+ if(!d.perms||typeof d.perms!=='object'){d.perms={};ch=true;}
+ d.admins.forEach(function(a){var def=roleDefaults(a.role);if(!d.perms[a.id]){d.perms[a.id]=def;ch=true;return;}
+  AREAS.forEach(function(ar){var p=d.perms[a.id][ar.k]=d.perms[a.id][ar.k]||{};ar.acts.forEach(function(x){if(typeof p[x]!=='boolean'){p[x]=def[ar.k][x];ch=true;}});});});
+ var st=staffList(d);(d.clients||[]).forEach(function(c,i){var a=adminById(d,c.assignedAdminId);if(st.length&&(!a||a.role==='super')){c.assignedAdminId=st[i%st.length].id;ch=true;}});
+ if(!Array.isArray(d.logs)){d.logs=seedLogs(d);ch=true;}
+ return ch;}
+function isSuper(d,id){var a=adminById(d,id);return !!(a&&a.role==='super');}
+function can(d,id,area,act){var a=adminById(d,id);if(!a)return false;if(a.role==='super')return true;var p=d.perms&&d.perms[id]&&d.perms[id][area];return !!(p&&p[act||'view']);}
+function actorNow(d){var r='';try{r=sessionStorage.getItem('isc_demo_role')||'';}catch(e){}if(r==='client'){var c=(d.clients||[]).filter(function(x){return x.id===CLIENT_ID;})[0];return {id:CLIENT_ID,name:c?clientName(c):'Client',role:'Client'};}
+ var a=adminById(d,currentAdminId());return {id:a?a.id:'',name:a?adminName(a):'System',role:a?ROLE_LABEL[a.role]||'Staff':'System'};}
+/* log(d, action, area, target, detail) — action: Login | Logout | Create | Edit | Delete | Status change | Upload | Permission change */
+function log(d,action,area,target,detail){if(!Array.isArray(d.logs))d.logs=[];var who=actorNow(d);
+ d.logs.push({id:'l-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),at:new Date().toISOString(),actorId:who.id,actor:who.name,role:who.role,action:action,area:area,target:target||'',detail:detail||''});
+ if(d.logs.length>3000)d.logs=d.logs.slice(-3000);}
+function seedLogs(d){var out=[],seed=7;function rnd(){seed=(seed*16807)%2147483647;return (seed-1)/2147483646;}function pick(a){return a[Math.floor(rnd()*a.length)];}
+ var admins=d.admins.length?d.admins:[SUPER_ADMIN],cl=d.clients||[],docs=d.documents||[],vs=d.visas||[],apps=d.applications||[];
+ var now=Date.now(),N=140;
+ for(var i=0;i<N;i++){var t=new Date(now-Math.round((N-i)*(45*864e5/N)+rnd()*3600e3));var h=t.getHours();if(h<8||h>18)t.setHours(9+Math.floor(rnd()*8));
+  var a=pick(admins),r=rnd(),e={id:'ls-'+i,at:t.toISOString(),actorId:a.id,actor:adminName(a),role:ROLE_LABEL[a.role||'staff']};
+  var mine=cl.filter(function(c){return a.role==='super'||c.assignedAdminId===a.id;});var c=pick(mine.length?mine:cl);
+  if(r<.22){e.action='Login';e.area='Account';e.target=adminName(a);e.detail='Signed in';}
+  else if(r<.40){var ap=apps.filter(function(x){return x.clientId===(c&&c.id);})[0]||pick(apps);e.action='Status change';e.area='Clients';e.target=clientName(c);e.detail=(ap?ap.type:'Application')+': '+pick(['New → Active','Active → Submitted','Submitted → Review','Review → Approved','Pending review → Approved','Received → Pending review']);}
+  else if(r<.55){e.action='Edit';e.area='Clients';e.target=clientName(c);e.detail=pick(['Updated phone number','Updated email address','Updated contact details']);}
+  else if(r<.63){e.action='Create';e.area='Clients';e.target=clientName(c);e.detail='Added application: '+pick(vs).name;}
+  else if(r<.73){e.action=pick(['Edit','Edit','Upload']);e.area='Documents';var dc=pick(docs);e.target=dc?dc.name:'Document';e.detail=e.action==='Upload'?'Attached sample file':'Updated version to '+(dc?dc.version:'v1.0');}
+  else if(r<.80){e.action='Edit';e.area='Case types';var v=pick(vs);e.target=v.name;e.detail=pick(['Updated required documents','Updated notes','Updated effective date']);}
+  else if(r<.86&&a.role==='super'){e.action='Permission change';e.area='Permissions';var s=pick(staffList(d).length?staffList(d):admins);e.target=adminName(s);e.detail=pick(['Documents: Delete on','Case types: Add on','Activity logs: View off']);}
+  else if(r<.92){e.action='Status change';e.area='Documents';e.target=clientName(c);e.detail=pick(docs).name+': Pending review → Approved';}
+  else {e.action='Logout';e.area='Account';e.target=adminName(a);e.detail='Signed out';}
+  out.push(e);}
+ return out;}
 function adminById(d,id){return (d.admins||[]).filter(function(a){return a.id===id;})[0]||null;}
 function adminName(a){return a?[a.first,a.last].filter(Boolean).join(' '):'Unassigned';}
 function currentAdminId(){try{return sessionStorage.getItem('isc_demo_admin')||'';}catch(e){return '';}}
@@ -180,7 +224,8 @@ function migrateEmails(d){d.emailsV=1;return false;}
    One thread per client. Every save() merges with what is already stored (messages unioned by id, read markers take the max),
    so a tab holding older data can never drop messages written by another tab. */
 function mergeThreads(d){if(!d||!d.threads)return;var cur=null;try{var raw=localStorage.getItem(KEY);cur=raw?JSON.parse(raw):null;}catch(e){}
- if(!cur||!cur.threads)return;Object.keys(cur.threads).forEach(function(cid){var a=cur.threads[cid],b=d.threads[cid];
+ if(!cur)return;if(Array.isArray(cur.logs)&&Array.isArray(d.logs)){var lid={};d.logs.forEach(function(l){lid[l.id]=1;});var add=cur.logs.filter(function(l){return !lid[l.id];});if(add.length){d.logs=d.logs.concat(add).sort(function(x,y){return x.at<y.at?-1:x.at>y.at?1:0;});}}
+ if(!cur.threads)return;Object.keys(cur.threads).forEach(function(cid){var a=cur.threads[cid],b=d.threads[cid];if(!(d.clients||[]).some(function(c){return c.id===cid;}))return;
   if(!b){d.threads[cid]=a;return;}var ids={};b.messages.forEach(function(m){ids[m.id]=1;});
   a.messages.forEach(function(m){if(!ids[m.id])b.messages.push(m);});b.messages.sort(function(x,y){return x.ts-y.ts;});
   b.read=b.read||{};['owner','client'].forEach(function(k){b.read[k]=Math.max(b.read[k]||0,(a.read||{})[k]||0);});});}
@@ -219,5 +264,5 @@ function migrateAll(d){var ch=false;if(migrateThreads(d))ch=true;if(migrateFiles
 function trySave(d){return save(d);}
 function progress(data,app){var visa=visaFor(data,app);if(visa){if(!visa.docIds.length)return 100;var stored={};(data.checklists[app.id]||[]).forEach(function(r){stored[r.docId]=r;});var done=visa.docIds.filter(function(id){return stored[id]&&stored[id].done;}).length;return Math.round(done/visa.docIds.length*100);}return typeof app.progress==='number'?app.progress:0;}
 function clientName(c){return [c.first,c.middle,c.last].filter(Boolean).join(' ');}
-window.ISCStore={COUNSELORS:COUNSELORS,COUNTRIES:COUNTRIES,counselorById:counselorById,visaCountry:visaCountry,fileName:fileName,syncRow:syncRow,syncReview:syncReview,FILE_STATUSES:FILE_STATUSES,stdName:stdName,extOf:extOf,clientCode:clientCode,visaCode:visaCode,docCode:docCode,KEY:KEY,OLDKEY:OLDKEY,TYPES:TYPES,STATUSES:STATUSES,CLIENT_ID:CLIENT_ID,today:today,alias:alias,load:load,save:save,reset:reset,progress:progress,clientName:clientName,visaFor:visaFor,distinctTypes:distinctTypes,visasOfType:visasOfType,effectiveDateOf:effectiveDateOf,docById:docById,ensureChecklist:ensureChecklist,docStatus:docStatus,monthKeys:monthKeys,trySave:trySave,SAMPLE_MAX:SAMPLE_MAX,DOC_STATUSES:DOC_STATUSES,slug:slug,adminById:adminById,adminName:adminName,currentAdminId:currentAdminId,esc:function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}};
+window.ISCStore={AREAS:AREAS,ACT_LABEL:ACT_LABEL,ROLE_LABEL:ROLE_LABEL,roleDefaults:roleDefaults,staffList:staffList,isSuper:isSuper,can:can,log:log,COUNSELORS:COUNSELORS,COUNTRIES:COUNTRIES,counselorById:counselorById,visaCountry:visaCountry,fileName:fileName,syncRow:syncRow,syncReview:syncReview,FILE_STATUSES:FILE_STATUSES,stdName:stdName,extOf:extOf,clientCode:clientCode,visaCode:visaCode,docCode:docCode,KEY:KEY,OLDKEY:OLDKEY,TYPES:TYPES,STATUSES:STATUSES,CLIENT_ID:CLIENT_ID,today:today,alias:alias,load:load,save:save,reset:reset,progress:progress,clientName:clientName,visaFor:visaFor,distinctTypes:distinctTypes,visasOfType:visasOfType,effectiveDateOf:effectiveDateOf,docById:docById,ensureChecklist:ensureChecklist,docStatus:docStatus,monthKeys:monthKeys,trySave:trySave,SAMPLE_MAX:SAMPLE_MAX,DOC_STATUSES:DOC_STATUSES,slug:slug,adminById:adminById,adminName:adminName,currentAdminId:currentAdminId,esc:function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}};
 })();
