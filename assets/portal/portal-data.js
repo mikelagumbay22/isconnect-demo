@@ -62,7 +62,7 @@ var TYPES=visasSeed().map(function(v){return v.name;});
 var NAMES=[['Andrea','Santos'],['Miguel','Bautista'],['Bea','Navarro'],['Joshua','Lim'],['Patricia','Mendoza'],['Carlo','Ramos'],['Nicole','Tan'],['Rafael','Aquino'],['Sofia','Castillo'],['Paolo','Fernandez'],['Kimberly','Ocampo'],['Angelo','Torres'],['Janelle','Sy'],['Gabriel','Domingo'],['Trisha','Pascual'],['Kevin','Ong'],['Erika','Salazar'],['Daniel','Morales'],['Camille','Valdez'],['Jerome','Santiago'],['Alyssa','Gomez'],['Mark','Rivera'],['Hazel','Manalo'],['Ivan','Herrera'],['Lea','Gutierrez']];
 function emailPart(t){return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');}
 function seed(){
- var clients=NAMES.map(function(n,i){return {id:'c'+i,code:'C'+String(i+1).padStart(3,'0'),first:n[0],middle:'',last:n[1],email:emailPart(n[0])+'.'+emailPart(n[1])+'@example.com',phone:'(403) 555-01'+String(i).padStart(2,'0'),address:'',language:'',dob:'',assignedAdminId:ADMINS[i%3].id,createdAt:'2026-0'+((i%8)+1)+'-'+String((i%26)+2).padStart(2,'0'),updatedAt:'2026-09-01'};});
+ var clients=NAMES.map(function(n,i){return {id:'c'+i,code:'C'+String(i+1).padStart(3,'0'),first:n[0],middle:'',last:n[1],email:emailPart(n[0])+'.'+emailPart(n[1])+'@example.com',phone:'(403) 555-01'+String(i).padStart(2,'0'),address:'',language:'',dob:'',assignedAdminId:ADMINS[i%3].id,updatedAt:'2026-09-01'};});
  var apps=[{id:'a1',clientId:'c0',type:'Canada Student Visa',visaId:'v-ca-sv',effectiveDate:'2026-01-01',status:'Active',date:'2026-09-15',due:'2026-11-15',createdAt:'2026-09-15',updatedAt:'2026-09-15'},
   {id:'a2',clientId:'c0',type:'University Admissions Support',visaId:'v-admission',effectiveDate:'2026-01-01',status:'Submitted',date:'2026-08-20',due:'2026-12-01',createdAt:'2026-08-20',updatedAt:'2026-08-20'}];
  var types=['v-ca-sv','v-admission','v-uk-sv','v-ie-sv','v-ca-pgwp','v-de-sv','v-consult','v-es-sv','v-nz-sv','v-ca-dep','v-uae-sv','v-sg-sp','v-ca-pr','v-schengen','v-ca-wp','v-uk-gr'];
@@ -72,8 +72,8 @@ function seed(){
   apps.push({id:'a-s'+j,clientId:'c'+j,type:vname(vid),visaId:vid,effectiveDate:'2026-01-01',status:stats[j%stats.length],date:dt,due:(j%4===0?'2026-09-':'2026-12-')+String((j%27)+1).padStart(2,'0'),createdAt:dt,updatedAt:dt,progress:[20,45,60,80,35,90,100,55][j%8]});}
  return {version:1,admins:ADMINS.slice(),clients:clients,applications:apps,checklists:{},
   tasks:tasksSeed(),announcements:announcementsSeed(),documents:docsSeed(),visas:vs,copyV:1,emailsV:1};}
-function load(){try{var raw=localStorage.getItem(KEY);if(raw){var d=JSON.parse(raw);if(d&&d.version===1){var ch=false;if(migrateDocs(d))ch=true;if(migrateMetrics(d))ch=true;if(migrateSamples(d))ch=true;if(migrateNames(d))ch=true;if(migrateAll(d))ch=true;if(migrateAdmins(d))ch=true;if(migrateRoles(d))ch=true;if(migrateTeam2Apps(d)){migrateRoles(d);ch=true;}if(migrateDue(d))ch=true;if(migrateStatus(d))ch=true;if(ensureAssignments(d))ch=true;if(ch)save(d);return d;}}}catch(e){}
- var s=seed();migrateDocs(s);migrateMetrics(s);migrateSamples(s);migrateNames(s);migrateAll(s);migrateAdmins(s);migrateRoles(s);migrateTeam2Apps(s);migrateDue(s);migrateStatus(s);save(s);return s;}
+function load(){try{var raw=localStorage.getItem(KEY);if(raw){var d=JSON.parse(raw);if(d&&d.version===1){var ch=false;if(migrateDocs(d))ch=true;if(migrateMetrics(d))ch=true;if(migrateSamples(d))ch=true;if(migrateNames(d))ch=true;if(migrateAll(d))ch=true;if(migrateAdmins(d))ch=true;if(migrateRoles(d))ch=true;if(migrateTeam2Apps(d)){migrateRoles(d);ch=true;}if(migrateDue(d))ch=true;if(migrateStatus(d))ch=true;if(migrateHistory(d))ch=true;if(ensureAssignments(d))ch=true;if(ch)save(d);return d;}}}catch(e){}
+ var s=seed();migrateDocs(s);migrateMetrics(s);migrateSamples(s);migrateNames(s);migrateAll(s);migrateAdmins(s);migrateRoles(s);migrateTeam2Apps(s);migrateDue(s);migrateStatus(s);migrateHistory(s);save(s);return s;}
 function save(d){try{ensureAssignments(d);mergeThreads(d);localStorage.setItem(KEY,JSON.stringify(d));return true;}catch(e){if(window.console)console.warn('ISConnect: could not save (storage full?)');return false;}}
 function reset(){localStorage.removeItem(KEY);return load();}
 /* adminsV:1 — guarantees data.admins and a valid assignedAdminId on every client (new clients default to the admin who adds them). */
@@ -229,17 +229,10 @@ function migrateDocs(data){if(data.docsV>=1)return false;data.checklists=data.ch
 function monthKeys(n,end){var d=end?new Date(end+'-01T12:00:00'):new Date();var out=[];for(var i=n-1;i>=0;i--){var x=new Date(d.getFullYear(),d.getMonth()-i,1);out.push(x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0'));}return out;}
 function hash(str){var h=2166136261;for(var i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
 function seededRevenue(k){var r=hash('isc-rev-'+k)%1000/1000;var m=+k.slice(5);var season=[0.82,0.86,1.0,1.08,1.12,1.04,0.96,0.9,1.15,1.2,1.06,0.88][m-1];return Math.round((7800+r*4200)*season/50)*50;}
-function migrateMetrics(data){var ch=false;var M=data.metrics;if(!M||M.v!==1){M=data.metrics={v:1,revenue:{},clients:{}};ch=true;}
+function migrateMetrics(data){var ch=false;var M=data.metrics;if(!M||M.v!==1){M=data.metrics={v:1,revenue:{}};ch=true;}
  var keys=monthKeys(12),n=(data.clients||[]).length;
  keys.forEach(function(k,i){if(M.revenue[k]==null){M.revenue[k]=seededRevenue(k);ch=true;}
-  if(i<keys.length-1&&M.clients[k]==null){var prev=null;for(var j=i-1;j>=0;j--){if(M.clients[keys[j]]!=null){prev=M.clients[keys[j]];break;}}
-   var base=prev==null?Math.max(1,Math.round(n*0.55)):prev;var step=hash('isc-cli-'+k)%3;M.clients[k]=Math.min(n,base+step);ch=true;}});
- /* status history (added later): data.metrics.status{'YYYY-MM':{status:n}} for past months, seeded once; current month is live */
- if(!M.status){M.status={};ch=true;}
- var sts=STATUSES.slice();(data.applications||[]).forEach(function(a){if(a.status&&sts.indexOf(a.status)<0)sts.push(a.status);});
- var w={New:.14,Submitted:.2,'In progress':.3,Approved:.2,Denied:.08,Closed:.08};
- keys.forEach(function(k,i){if(i===keys.length-1||M.status[k])return;var tot=Math.max(4,Math.round((M.clients[k]||n)*1.05));var o={};
-  sts.forEach(function(st){var j=(hash('isc-st-'+k+'-'+st)%100)/100;o[st]=Math.max(0,Math.round(tot*(w[st]||.05)*(0.6+0.8*j)));});M.status[k]=o;ch=true;});
+});
  return ch;}
 /* Requirement samples (samplesV:1). doc.sample = {name,type,size,dataUrl,addedAt} or absent. Files are stored as data URLs in isc_demo_v1
    (owner-attached, max SAMPLE_MAX bytes each). Migration: a legacy filename-only doc.sampleFileName becomes a metadata-only sample
@@ -355,5 +348,26 @@ function migrateAll(d){var ch=false;if(migrateThreads(d))ch=true;if(migrateFiles
 function trySave(d){return save(d);}
 function progress(data,app){var visa=visaFor(data,app);if(visa){if(!visa.docIds.length)return 100;var stored={};(data.checklists[app.id]||[]).forEach(function(r){stored[r.docId]=r;});var done=visa.docIds.filter(function(id){return stored[id]&&stored[id].done;}).length;return Math.round(done/visa.docIds.length*100);}return typeof app.progress==='number'?app.progress:0;}
 function clientName(c){return [c.first,c.middle,c.last].filter(Boolean).join(' ');}
-window.ISCStore={allApproved:allApproved,WORK:WORK_ST,dueInfo:dueInfo,defaultDue:defaultDue,addDays:addDays,OPEN:OPEN_ST,adminPhoto:adminPhoto,levels:levels,levelById:levelById,roleLabel:roleLabel,manages:manages,reportsTo:reportsTo,LEVELS:LEVELS,managers:managers,teamIds:teamIds,AREAS:AREAS,ACT_LABEL:ACT_LABEL,ROLE_LABEL:ROLE_LABEL,roleDefaults:roleDefaults,staffList:staffList,isSuper:isSuper,can:can,log:log,COUNSELORS:COUNSELORS,COUNTRIES:COUNTRIES,counselorById:counselorById,visaCountry:visaCountry,fileName:fileName,syncRow:syncRow,syncReview:syncReview,FILE_STATUSES:FILE_STATUSES,stdName:stdName,extOf:extOf,clientCode:clientCode,visaCode:visaCode,docCode:docCode,KEY:KEY,OLDKEY:OLDKEY,TYPES:TYPES,STATUSES:STATUSES,CLIENT_ID:CLIENT_ID,today:today,alias:alias,load:load,save:save,reset:reset,progress:progress,clientName:clientName,visaFor:visaFor,distinctTypes:distinctTypes,visasOfType:visasOfType,effectiveDateOf:effectiveDateOf,docById:docById,ensureChecklist:ensureChecklist,docStatus:docStatus,monthKeys:monthKeys,trySave:trySave,SAMPLE_MAX:SAMPLE_MAX,DOC_STATUSES:DOC_STATUSES,slug:slug,adminById:adminById,adminName:adminName,currentAdminId:currentAdminId,esc:function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}};
+/* histV:1 — real history for the dashboard. Clients: createdAt (backfilled only when missing/invalid, spread over the past 12 months,
+   never after the client's earliest application start; an existing createdAt is never overwritten). Applications: statusHistory
+   [{status,at}] backfilled from start date / updatedAt / decision date; new status changes append. Seeded client and case metrics removed. */
+function validD(s){return typeof s==='string'&&/^\d{4}-\d{2}-\d{2}/.test(s)&&!isNaN(Date.parse(s.slice(0,10)));}
+function dayDiff(a,b){return Math.round((Date.parse(b)-Date.parse(a))/864e5);}
+function backfillHistory(a,t){var s=(validD(a.date)?a.date:validD(a.createdAt)?a.createdAt:t).slice(0,10);if(s>t)s=t;var h=[{status:'New',at:s}],st=a.status;
+ if(st==='New')return h;var cap=function(x){return x>t?t:x;};var dur=25+hash('isc-h-'+a.id)%70;
+ var end=cap(validD(a.updatedAt)&&a.updatedAt.slice(0,10)>addDays(s,dur)?a.updatedAt.slice(0,10):addDays(s,dur));if(a.decision&&validD(a.decision.date))end=cap(a.decision.date.slice(0,10));if(end<s)end=s;
+ var g=dayDiff(s,end),p=addDays(s,Math.max(0,Math.min(7,Math.round(g/4))));h.push({status:'In progress',at:p});if(st==='In progress')return h;
+ if(st==='Submitted'||st==='Approved'||st==='Denied')h.push({status:'Submitted',at:st==='Submitted'?end:addDays(p,Math.round(dayDiff(p,end)/2))});
+ if(st!=='Submitted')h.push({status:st,at:end});return h;}
+function statusAt(a,iso){var h=a.statusHistory;if(!Array.isArray(h)||!h.length){var s=(a.date||a.createdAt||'');return s&&s.slice(0,10)<=iso?a.status:null;}var r=null;h.forEach(function(e){if(e.at<=iso)r=e.status;});return r;}
+function addStatus(a,st){if(!Array.isArray(a.statusHistory))a.statusHistory=backfillHistory(a,today());a.statusHistory.push({status:st,at:today()});}
+function migrateHistory(d){if(d.histV>=1)return false;var t=today(),lo=addDays(t,-360);
+ (d.clients||[]).forEach(function(c){if(validD(c.createdAt))return;var st=(d.applications||[]).filter(function(a){return a.clientId===c.id;}).map(function(a){return a.date||a.createdAt;}).filter(validD).map(function(x){return x.slice(0,10);}).sort();
+  var hi=st[0]||t;if(hi>t)hi=t;var from=hi<lo?addDays(hi,-30):lo;var span=Math.max(0,dayDiff(from,hi));c.createdAt=addDays(from,span?hash('isc-ca-'+c.id)%(span+1):0);});
+ (d.applications||[]).forEach(function(a){if(!Array.isArray(a.statusHistory)||!a.statusHistory.length)a.statusHistory=backfillHistory(a,t);});
+ if(d.metrics){delete d.metrics.clients;delete d.metrics.status;}d.histV=1;return true;}
+/* Start date -> requirement version: the latest record of the type effective on or before start; else the earliest; else any record. */
+function visaForStart(data,type,start){var all=visasOfType(data,type);var recs=all.filter(function(v){return validD(v.effective);}).sort(function(x,y){return x.effective<y.effective?-1:x.effective>y.effective?1:0;});
+ if(!recs.length)return all[0]||null;var pick=null;recs.forEach(function(v){if(v.effective<=start)pick=v;});return pick||recs[0];}
+window.ISCStore={statusAt:statusAt,addStatus:addStatus,visaForStart:visaForStart,allApproved:allApproved,WORK:WORK_ST,dueInfo:dueInfo,defaultDue:defaultDue,addDays:addDays,OPEN:OPEN_ST,adminPhoto:adminPhoto,levels:levels,levelById:levelById,roleLabel:roleLabel,manages:manages,reportsTo:reportsTo,LEVELS:LEVELS,managers:managers,teamIds:teamIds,AREAS:AREAS,ACT_LABEL:ACT_LABEL,ROLE_LABEL:ROLE_LABEL,roleDefaults:roleDefaults,staffList:staffList,isSuper:isSuper,can:can,log:log,COUNSELORS:COUNSELORS,COUNTRIES:COUNTRIES,counselorById:counselorById,visaCountry:visaCountry,fileName:fileName,syncRow:syncRow,syncReview:syncReview,FILE_STATUSES:FILE_STATUSES,stdName:stdName,extOf:extOf,clientCode:clientCode,visaCode:visaCode,docCode:docCode,KEY:KEY,OLDKEY:OLDKEY,TYPES:TYPES,STATUSES:STATUSES,CLIENT_ID:CLIENT_ID,today:today,alias:alias,load:load,save:save,reset:reset,progress:progress,clientName:clientName,visaFor:visaFor,distinctTypes:distinctTypes,visasOfType:visasOfType,effectiveDateOf:effectiveDateOf,docById:docById,ensureChecklist:ensureChecklist,docStatus:docStatus,monthKeys:monthKeys,trySave:trySave,SAMPLE_MAX:SAMPLE_MAX,DOC_STATUSES:DOC_STATUSES,slug:slug,adminById:adminById,adminName:adminName,currentAdminId:currentAdminId,esc:function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}};
 })();

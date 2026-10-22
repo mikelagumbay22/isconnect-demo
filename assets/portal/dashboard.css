@@ -327,3 +327,6 @@ body.shad .badge.st-approved::before{background:#16a34a}body.shad .badge.st-deni
 .dc-note{margin:12px 0 0;padding:10px 12px;background:#fff;border-radius:10px;border:1px solid var(--line)}
 .dc-file{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:12px}
 .due-banner.good{background:#f0fdf4;border-color:#86efac}.due-banner.good .db-ic{background:#16a34a}
+/* v20261022r */
+.client-since{margin:2px 0 0;font-size:.85rem}
+td.nowrap{white-space:nowrap}
