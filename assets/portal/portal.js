@@ -35,7 +35,9 @@ function scopeToggle(el,onChange){if(!el)return;var cur=getScope();
   el.querySelectorAll('[data-scope]').forEach(function(x){x.setAttribute('aria-pressed',String(x===b));});onChange(v);});});}
 window.ISCScope={get:getScope,toggle:scopeToggle,me:ME};
 document.querySelectorAll('[data-admin-name]').forEach(function(el){el.textContent=S.adminName(S.adminById(data,ME));});
-function visaOptions(sel){return S.distinctTypes(data).map(function(n){return '<option value="'+esc(n)+'"'+(n===sel?' selected':'')+'>'+esc(n)+'</option>';}).join('');}
+function typeCountry(n){var v=(data.visas||[]).find(function(x){return x.name===n;});return S.visaCountry(v);}
+function counselorHtml(a){var c=S.counselorById(a&&a.counselorId);if(!c)return '';return '<p class="counselor"><picture><source type="image/webp" srcset="../assets/img/team/'+c.photo+'.webp?v=20261021c"><img src="../assets/img/team/'+c.photo+'.jpg?v=20261021c" width="40" height="40" alt="" decoding="async"></picture><span>Education Counselor: <strong>'+esc(c.name)+'</strong></span></p>';}
+function visaOptions(sel){return S.distinctTypes(data).map(function(n){return '<option value="'+esc(n)+'"'+(n===sel?' selected':'')+'>'+esc(n)+' — '+esc(typeCountry(n))+'</option>';}).join('');}
 function fmtEff(iso){var m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];var parts=String(iso||'').split('-');if(parts.length===3){var mo=parseInt(parts[1],10);if(mo>=1&&mo<=12)return m[mo-1]+' '+parseInt(parts[2],10)+', '+parts[0]+' ('+iso+')';}return iso;}
 /* Populate an Effective-date <select> from the visa RECORDS of a type: valid dates newest first, value = visa record id. No valid date -> single 'No effective date yet' option (value ''). Returns true if a valid date is available. */
 function populateEffective(typeName,sel){var recs=S.visasOfType(data,typeName).filter(function(v){return v.effective&&!isNaN(Date.parse(v.effective));});
@@ -53,7 +55,7 @@ if(page==='client-dashboard'){
  wireReset();
 }
 /* Empty-state block. Image: AI-generated still (Higgsfield gpt_image_2_5), disclosed in its alt text. */
-function emptyState(title,body){return '<div class="empty-state"><img src="../assets/portal/portal-empty-480.webp?v=20261021b" srcset="../assets/portal/portal-empty-240.webp?v=20261021b 240w, ../assets/portal/portal-empty-480.webp?v=20261021b 480w" sizes="200px" width="480" height="360" loading="lazy" alt="AI-generated image: an empty letter tray beside a small plant on a desk"><div><h3>'+esc(title)+'</h3><p class="muted">'+esc(body)+'</p></div></div>';}
+function emptyState(title,body){return '<div class="empty-state"><img src="../assets/portal/portal-empty-480.webp?v=20261021c" srcset="../assets/portal/portal-empty-240.webp?v=20261021c 240w, ../assets/portal/portal-empty-480.webp?v=20261021c 480w" sizes="200px" width="480" height="360" loading="lazy" alt="AI-generated image: an empty letter tray beside a small plant on a desk"><div><h3>'+esc(title)+'</h3><p class="muted">'+esc(body)+'</p></div></div>';}
 /* Owner-updates carousel: arrows, dots, swipe, Left/Right keys, optional autoplay (off by default; pauses on hover/focus; unavailable under reduced motion). */
 function initCarousel(items){var track=$('announcements'),vp=$('cViewport'),dots=$('cDots'),root=$('updates');if(!track)return;var n=items.length,i=0,timer=null,playing=false,paused=false;
  var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -82,8 +84,8 @@ if(page==='application'){
  var FL={'received':'Received','pending review':'Pending review','approved':'Approved','rejected':'Rejected'};
  function render(focusSel){ var p=S.progress(data,app); var done=cl.filter(function(x){return x.done;}).length;
   /* Header image: AI-generated still (Higgsfield gpt_image_2_5), disclosed in alt text. */
-  $('appDetail').innerHTML='<div class="app-hero"><img src="../assets/portal/portal-app-1280.webp?v=20261021b" srcset="../assets/portal/portal-app-640.webp?v=20261021b 640w, ../assets/portal/portal-app-1280.webp?v=20261021b 1280w" sizes="(max-width: 900px) 100vw, 960px" width="1280" height="300" alt="AI-generated image: a folder, a pen and a notebook on a wooden desk"></div>'
-  +'<p>'+badge(app.status)+' <span class="badge">'+esc(app.type)+'</span></p><h2>'+esc(app.type)+' application</h2><p class="muted">Started '+esc(app.date)+' · Effective '+esc(S.effectiveDateOf(data,app)||'—')+'</p>'
+  $('appDetail').innerHTML='<div class="app-hero"><img src="../assets/portal/portal-app-1280.webp?v=20261021c" srcset="../assets/portal/portal-app-640.webp?v=20261021c 640w, ../assets/portal/portal-app-1280.webp?v=20261021c 1280w" sizes="(max-width: 900px) 100vw, 960px" width="1280" height="300" alt="AI-generated image: a folder, a pen and a notebook on a wooden desk"></div>'
+  +'<p>'+badge(app.status)+' <span class="badge">'+esc(app.type)+'</span></p><h2>'+esc(app.type)+' application</h2><p class="muted">Started '+esc(app.date)+' · Effective '+esc(S.effectiveDateOf(data,app)||'—')+'</p>'+counselorHtml(app)
   +'<div class="bar" role="progressbar" aria-valuenow="'+p+'" aria-valuemin="0" aria-valuemax="100" aria-label="Checklist progress"><i style="width:'+p+'%"></i></div><p><strong>'+p+'% complete</strong> · Checklist status: <strong>'+(p===100?'Complete':'Incomplete')+'</strong> ('+done+' of '+cl.length+' done)</p>'
   +(app.status==='Review'?'<p class="review-note">All required documents are uploaded. Your counselor is reviewing your application.</p>':'')
   +(cl.length?'<p class="muted">Requirements are based on your case type. You can upload more than one file for each requirement.</p><ul class="check" style="list-style:none;padding:0">'
@@ -143,7 +145,7 @@ function openSample(doc,opener){var x=doc&&doc.sample;if(!x)return;if(sampleUrl)
  $('samplePreview').innerHTML=body;openModal('sampleModal',opener);}
 /* ---- Shared: application documents dialog (owner Clients + owner Dashboard). Needs #docsModal with the docs* ids. ---- */
 function appDetailsHtml(a,visa){var c=clientById(a.clientId);function row(k,v){return '<div><dt>'+k+'</dt><dd>'+v+'</dd></div>';}
- return '<dl class="detail-grid">'+row('Client',esc(S.clientName(c)))+row('Case type',esc(a.type))+row('Status',badge(a.status))
+ return '<dl class="detail-grid">'+row('Client',esc(S.clientName(c)))+row('Case type',esc(a.type))+row('Country',esc(S.visaCountry(visa)))+row('Education Counselor',esc((S.counselorById(a.counselorId)||{}).name||'—'))+row('Status',badge(a.status))
   +row('Effective',esc(S.effectiveDateOf(data,a)||'—'))+row('Created',esc(a.createdAt||a.date||'—'))+row('Updated',esc(a.updatedAt||a.createdAt||'—'))
   +(a.due?row('Due',esc(a.due)):'')+'</dl><p class="detail-notes"><span class="muted">Notes</span><br>'+esc((visa&&visa.notes)||'—')+'</p>';}
  var DOC_LABEL={'received':'Received','pending review':'Pending review','approved':'Approved','rejected':'Rejected','missing':'Missing'};
@@ -155,7 +157,7 @@ function renderDocs(appId){var a=appById(appId);if(!a)return;docsApp=appId;var v
  var got=[],miss=cl.filter(function(r){return !r.done;});cl.forEach(function(r){(r.files||[]).forEach(function(f,k){got.push({r:r,f:f,k:k});});});
  var vname=visa?visa.name+' (effective '+(visa.effective||'—')+')':a.type;
  $('docsTitle').textContent=a.type+' — documents';
- $('docsSub').innerHTML='Client: <strong>'+esc(S.clientName(clientById(a.clientId)))+'</strong> · Case type: <a href="visas.html">'+esc(vname)+'</a> · '+badge(a.status);
+ $('docsSub').innerHTML='Client: <strong>'+esc(S.clientName(clientById(a.clientId)))+'</strong> · Case type: <a href="visas.html">'+esc(vname)+'</a> · Country: <strong>'+esc(S.visaCountry(visa))+'</strong> · Education Counselor: <strong>'+esc((S.counselorById(a.counselorId)||{}).name||'—')+'</strong> · '+badge(a.status);
  var nDone=cl.filter(function(r){return r.done;}).length;
  $('docsSummary').textContent=cl.length?(nDone+' of '+cl.length+' required documents received · '+got.length+' file'+(got.length===1?'':'s')+' uploaded'):'This visa has no required documents listed.';
  $('docsList').innerHTML=got.length?got.map(function(g){var f=g.f,key=esc(g.r.docId+':'+g.k);return '<li class="doc-row"><div class="doc-main"><strong>'+esc(g.r.label)+'</strong>'
@@ -314,7 +316,7 @@ if(page==='clients'){
   $('editApps').innerHTML=apps.length?apps.map(function(a){var n=docCount(a),eff=S.effectiveDateOf(data,a)||'—';
    return '<li><div class="app-card" role="button" tabindex="0" data-app="'+esc(a.id)+'" aria-label="'+esc(a.type+', '+a.status+', '+n+' document'+(n===1?'':'s')+'. Open documents')+'">'
    +'<div class="app-card-top"><span class="app-card-type">'+esc(a.type)+'</span>'+badge(a.status)+'</div>'
-   +'<dl class="app-card-meta"><div><dt>Effective</dt><dd>'+esc(eff)+'</dd></div><div><dt>Created</dt><dd>'+esc(a.createdAt||a.date)+'</dd></div><div><dt>Updated</dt><dd>'+esc(a.updatedAt||a.createdAt||a.date)+'</dd></div></dl>'
+   +'<dl class="app-card-meta"><div><dt>Counselor</dt><dd>'+esc((S.counselorById(a.counselorId)||{}).name||'—')+'</dd></div><div><dt>Effective</dt><dd>'+esc(eff)+'</dd></div><div><dt>Created</dt><dd>'+esc(a.createdAt||a.date)+'</dd></div><div><dt>Updated</dt><dd>'+esc(a.updatedAt||a.createdAt||a.date)+'</dd></div></dl>'
    +'<div class="app-card-foot"><span>'+n+' document'+(n===1?'':'s')+'</span><span class="app-card-chev" aria-hidden="true">View documents ›</span></div></div></li>';}).join(''):'<li class="card">No applications yet.</li>';
   S.save(data);
   document.querySelectorAll('#editApps [data-app]').forEach(function(el){function go(){openDocs(el.getAttribute('data-app'),el);}
@@ -391,12 +393,12 @@ if(page==='visas'){
  $('moveRight').addEventListener('click',function(){move(true);}); $('moveLeft').addEventListener('click',function(){move(false);});
  function render(){/* Display-only sort: effective date DESC (newest first); missing/invalid dates last; stable via original index. Stored order in data.visas is NOT mutated, so dropdowns elsewhere keep their order. */
   var sorted=data.visas.map(function(v,i){return {v:v,i:i};}).sort(function(a,b){var ta=Date.parse(a.v.effective),tb=Date.parse(b.v.effective);var va=!isNaN(ta),vb=!isNaN(tb);if(va&&vb)return (tb-ta)||(a.i-b.i);if(va)return -1;if(vb)return 1;return a.i-b.i;}).map(function(x){return x.v;});
-  $('visaRows').innerHTML=sorted.map(function(v){return '<tr><td><strong>'+esc(v.name)+'</strong></td><td>'+esc(v.effective)+'</td><td>'+esc(v.notes)+'</td><td>'+v.docIds.length+'</td><td>'+esc(v.createdAt)+'</td><td>'+esc(v.updatedAt)+'</td><td><button type="button" class="icon-btn" data-edit-visa="'+v.id+'" aria-label="Edit visa '+esc(v.name)+'" title="Edit visa">'+PENCIL+'</button></td></tr>';}).join('');
-  document.querySelectorAll('[data-edit-visa]').forEach(function(b){b.addEventListener('click',function(){editingVisa=b.getAttribute('data-edit-visa');var v=data.visas.find(function(x){return x.id===editingVisa;});$('visaName').value=v.name;$('visaDate').value=v.effective;$('visaNotes').value=v.notes;pickerChosen=v.docIds.slice();selAvail.clear();selReq.clear();renderPicker();openModal('visaModal');lastFocus=b;});});}
+  $('visaRows').innerHTML=sorted.map(function(v){return '<tr><td><strong>'+esc(v.name)+'</strong></td><td>'+esc(S.visaCountry(v))+'</td><td>'+esc(v.effective)+'</td><td>'+esc(v.notes)+'</td><td>'+v.docIds.length+'</td><td>'+esc(v.createdAt)+'</td><td>'+esc(v.updatedAt)+'</td><td><button type="button" class="icon-btn" data-edit-visa="'+v.id+'" aria-label="Edit visa '+esc(v.name)+'" title="Edit visa">'+PENCIL+'</button></td></tr>';}).join('');
+  document.querySelectorAll('[data-edit-visa]').forEach(function(b){b.addEventListener('click',function(){editingVisa=b.getAttribute('data-edit-visa');var v=data.visas.find(function(x){return x.id===editingVisa;});$('visaName').value=v.name;$('visaCountry').value=S.visaCountry(v);$('visaDate').value=v.effective;$('visaNotes').value=v.notes;pickerChosen=v.docIds.slice();selAvail.clear();selReq.clear();renderPicker();openModal('visaModal');lastFocus=b;});});}
  $('addVisaBtn').addEventListener('click',function(){editingVisa=null;$('visaForm').reset();pickerChosen=[];selAvail.clear();selReq.clear();renderPicker();openModal('visaModal');});
- $('visaForm').addEventListener('submit',function(e){e.preventDefault();var name=$('visaName').value.trim();if(!name){$('visaMsg').textContent='Case type is required.';return;}
-  if(editingVisa){var v=data.visas.find(function(x){return x.id===editingVisa;});v.name=name;v.effective=$('visaDate').value;v.notes=$('visaNotes').value;v.docIds=pickerChosen.slice();v.updatedAt=S.today();}
-  else{data.visas.push({id:'v-'+Date.now(),name:name,effective:$('visaDate').value,notes:$('visaNotes').value,docIds:pickerChosen.slice(),createdAt:S.today(),updatedAt:S.today()});}
+ $('visaForm').addEventListener('submit',function(e){e.preventDefault();var name=$('visaName').value.trim();if(!name){$('visaMsg').textContent='Case type is required.';return;}var country=$('visaCountry').value;if(!country){$('visaMsg').textContent='Country is required.';$('visaCountry').focus();return;}
+  if(editingVisa){var v=data.visas.find(function(x){return x.id===editingVisa;});v.name=name;v.country=country;v.effective=$('visaDate').value;v.notes=$('visaNotes').value;v.docIds=pickerChosen.slice();v.updatedAt=S.today();}
+  else{data.visas.push({id:'v-'+Date.now(),name:name,country:country,effective:$('visaDate').value,notes:$('visaNotes').value,docIds:pickerChosen.slice(),createdAt:S.today(),updatedAt:S.today()});}
   S.save(data);closeModal('visaModal');render();});
  renderPicker(); render();
 }
