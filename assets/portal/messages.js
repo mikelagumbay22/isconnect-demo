@@ -23,13 +23,14 @@ function send(cid,me,text){text=String(text||'').replace(/\s+$/,'');if(!text.tri
 function initials(c){return ((c.first||'?')[0]+((c.last||'')[0]||'')).toUpperCase();}
 function clientName(c){return [c.first,c.last].filter(Boolean).join(' ');}
 /* Render messages with Messenger-style separators (new group after a 15+ min gap or a Toronto day change) and Sent/Seen on my last message. */
+function byAv(d,m){var a=m.from==='owner'&&m.by&&S.adminById(d,m.by);if(!a)return '';var ph=S.adminPhoto(a);return '<span class="by-av">'+(ph?'<img src="'+esc(ph)+'" alt="">':esc(initials(a)))+'</span>';}
 function ownerWho(d,m){var a=m.by&&S.adminById(d,m.by);return a?S.adminName(a):'International Students Connect';}
 function renderLog(el,t,me){var D=fresh();var ms=(t&&t.messages)||[];if(!ms.length){el.innerHTML='<p class="chat-empty">No messages yet. Say hello!</p>';return;}
  var lastMine=-1;ms.forEach(function(m,i){if(m.from===me)lastMine=i;});var h='',prev=null;
  ms.forEach(function(m,i){if(!prev||m.ts-prev.ts>GAP||dayKey(m.ts)!==dayKey(prev.ts))h+='<div class="chat-sep" role="separator"><span>'+esc(sepLabel(m.ts))+'</span></div>';
   var mine=m.from===me,who=mine?'You':(m.from==='owner'?ownerWho(D,m):'Client');
   var showBy=m.from==='owner'&&(!prev||prev.from!=='owner'||prev.by!==m.by||m.ts-prev.ts>GAP)&&!(mine&&m.by===ME);
-  h+='<div class="chat-msg '+(mine?'mine':'theirs')+' from-'+m.from+'">'+(showBy?'<span class="chat-by" aria-hidden="true">'+esc(ownerWho(D,m))+'</span>':'')+'<p class="chat-bubble"><span class="sr-only">'+who+': </span>'+esc(m.text)+'</p>'
+  h+='<div class="chat-msg '+(mine?'mine':'theirs')+' from-'+m.from+'">'+(showBy?'<span class="chat-by" aria-hidden="true">'+byAv(D,m)+esc(ownerWho(D,m))+'</span>':'')+'<p class="chat-bubble"><span class="sr-only">'+who+': </span>'+esc(m.text)+'</p>'
    +(i===lastMine?'<span class="chat-status">'+(((t.read||{})[other(me)]||0)>=m.ts?'Seen':'Sent')+'</span>':'')+'</div>';prev=m;});
  el.innerHTML=h;el.scrollTop=el.scrollHeight;}
 function composer(form,ta,onSend){ta.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();form.requestSubmit?form.requestSubmit():form.dispatchEvent(new Event('submit',{cancelable:true}));}});

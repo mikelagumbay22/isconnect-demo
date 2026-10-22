@@ -213,3 +213,8 @@ tr.is-archived td{color:#8a93a3}tr.is-archived .mem-av{filter:grayscale(1);opaci
 .lvl-behav{display:grid;gap:10px;margin:14px 0 6px}.sw-row{display:flex;gap:12px;align-items:flex-start;cursor:pointer;padding:10px 12px;border:1px solid #e3e7ee;border-radius:12px}.sw-row strong{display:block;font-size:.92rem}.sw-row .muted{display:block}
 .lvl-h3{font-size:1rem;margin:16px 0 8px}#lvlDelMove{display:grid;gap:6px;margin-top:10px}#lvlDelMove select{width:100%}#lvlDelMgrWrap{display:grid;gap:6px;margin-top:6px}#lvlDelMgrWrap[hidden]{display:none}
 #lvStatus:empty{display:none}
+/* Staff avatars */
+.who-cell{display:inline-flex;align-items:center;gap:0;white-space:nowrap}.who-cell .c-av.sm{margin-right:8px}
+.side-me .c-av.md img{object-position:50% 20%}.c-av img{object-position:50% 20%}
+.by-av{display:inline-flex;width:18px;height:18px;border-radius:50%;overflow:hidden;background:#1d3f7a;color:#fff;font-size:.55rem;align-items:center;justify-content:center;vertical-align:middle;margin-right:5px}.by-av img{width:100%;height:100%;object-fit:cover;object-position:50% 20%}
+.m-photo{margin-bottom:16px}
