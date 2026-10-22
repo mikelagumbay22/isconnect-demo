@@ -6,7 +6,8 @@ function $(id){return document.getElementById(id);}
 if(new URLSearchParams(location.search).get('reset')==='1'){S.reset();var ru=new URL(location.href);ru.searchParams.delete('reset');location.replace(ru.pathname+ru.search+ru.hash);return;}
 function appById(id){return data.applications.find(function(a){return a.id===id;});}
 function clientById(id){return data.clients.find(function(c){return c.id===id;});}
-function badge(st){return '<span class="badge '+esc(st)+'">'+esc(st)+'</span>';}
+function stSlug(st){return String(st||'').toLowerCase().replace(/[^a-z0-9]+/g,'-');}
+function badge(st){return '<span class="badge st-'+stSlug(st)+'">'+esc(st)+'</span>';}
 var MSGI='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
 var KEYI='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2.5 2.5"/></svg>';
 function toast(t){var el=document.getElementById('appToast');if(!el){el=document.createElement('div');el.id='appToast';el.className='app-toast';el.setAttribute('role','status');el.setAttribute('aria-live','polite');document.body.appendChild(el);}
@@ -17,8 +18,8 @@ var TRASH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wid
 var IS_OWNER=document.body.getAttribute('data-role')==='owner',ME0=S.currentAdminId();
 var SUPER=S.isSuper(data,ME0);var ROLE0=(S.adminById(data,ME0)||{}).role||'staff';var MGR=S.manages(data,ROLE0);var TEAM=S.teamIds(data,ME0);
 function can(area,act){return S.can(data,ME0,area,act);}
-var NAV=[['dashboard.html','Dashboard','dashboard'],['clients.html','Clients','clients'],['documents.html','Documents','documents'],['visas.html','Case types','casetypes'],['messages.html','Messages','messages'],['logs.html','Activity logs','logs'],['team.html','Team','team']];
-var PAGE_AREA={'owner-dashboard':'dashboard',clients:'clients',documents:'documents',visas:'casetypes',messages:'messages',logs:'logs',team:'team'};
+var NAV=[['dashboard.html','Dashboard','dashboard'],['clients.html','Clients','clients'],['tasks.html','Tasks','clients'],['documents.html','Documents','documents'],['visas.html','Case types','casetypes'],['messages.html','Messages','messages'],['logs.html','Activity logs','logs'],['team.html','Team','team']];
+var PAGE_AREA={'owner-dashboard':'dashboard',clients:'clients','admin-tasks':'clients',documents:'documents',visas:'casetypes',messages:'messages',logs:'logs',team:'team'};
 function allowed(area){return area==='_super'?SUPER:can(area,'view');}
 function clientAv(c,cls){var n=((c&&c.first||'?').charAt(0)+((c&&c.last)||'').charAt(0)).toUpperCase();return c&&c.photo?'<span class="c-av '+(cls||'')+'"><img src="'+esc(c.photo)+'" alt=""></span>':'<span class="c-av '+(cls||'')+'" aria-hidden="true">'+esc(n)+'</span>';}
 function staffAv(a,cls){return clientAv({first:a&&a.first,last:a&&a.last,photo:S.adminPhoto(a)},cls);}
@@ -41,6 +42,8 @@ if(IS_OWNER){
  var here=location.pathname.split('/').pop()||'dashboard.html',navOk=NAV.filter(function(n){return allowed(n[2]);});
  var navEl=document.querySelector('.side nav');
  if(navEl)navEl.innerHTML=navOk.map(function(n){var m=n[0]==='messages.html';return '<a href="'+n[0]+'"'+(m?' class="nav-msg"':'')+(n[0]===here?' aria-current="page"':'')+'>'+n[1]+(m?' <span class="nav-badge" id="navMsgBadge" hidden></span>':'')+'</a>';}).join('')+'<a href="../index.html">View public site</a><a href="#" data-signout>Sign out</a>';
+ /* Automatic reminders (simulated email): open apps with missing documents, due within 7 days or overdue, not reminded in the last 3 days. Max 5 per page load. */
+ (function(){var now=Date.now(),n=0;data.applications.forEach(function(a){if(n>=5)return;var i=S.dueInfo(data,a);if(i.state!=='overdue'&&i.state!=='soon')return;if(a.remindedAt&&now-Date.parse(a.remindedAt)<3*864e5)return;if(sendReminder(a,true))n++;});})();
  var sideP=document.querySelector('.side > p');if(sideP&&!sideP.querySelector('.role-tag'))sideP.insertAdjacentHTML('beforeend','<span class="role-tag">'+esc(S.roleLabel(data,ROLE0))+'</span>');
  var pArea=PAGE_AREA[page];
  if(pArea&&!allowed(pArea)){
@@ -55,6 +58,27 @@ try{if(sessionStorage.getItem('isc_login_evt')){sessionStorage.removeItem('isc_l
 /* --- modal helpers: open/close, Escape, focus return, Tab trap-lite --- */
 var lastFocus=null,modalStack=[];/* stack: [{id,ret}] so a modal can open over another; Esc/close returns focus to its opener */
 function topModal(){var t=modalStack[modalStack.length-1];return t?$(t.id):document.querySelector('.modal-back:not([hidden])');}
+var BELL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>';
+/* Shared documents dialog markup (Clients, Dashboard, Tasks). */
+(function(){var m=$('docsModal');if(!m||m.children.length)return;
+ m.innerHTML='<div class="modal wide docs-modal" role="dialog" aria-modal="true" aria-labelledby="docsTitle">'
+ +'<div class="dm-head"><div class="dm-titles"><p class="dm-kicker" id="docsKicker"></p><h2 id="docsTitle">Documents</h2></div>'
+ +'<div class="dm-head-acts"><label class="dm-status"><span>Status</span><select id="docsStatus"></select></label>'
+ +'<button type="button" class="icon-btn" id="docsRemind" aria-label="Send reminder" title="Send reminder">'+BELL+'</button>'
+ +'<button class="dialog-x" type="button" data-close="docsModal" aria-label="Close">×</button></div></div>'
+ +'<p class="dm-st-hint" id="docsStatusHint" hidden></p><dl class="dm-meta" id="docsMeta"></dl><section class="dm-decision" id="docsDecision" aria-labelledby="decH" hidden></section>'
+ +'<div class="dm-progress"><div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Required documents received" id="docsBar"><i></i></div><p id="docsSummary" class="docs-summary"></p></div>'
+ +'<h3 class="dm-h">Submitted documents</h3><ul id="docsList" class="doc-list"></ul>'
+ +'<section id="docsMissingWrap" class="dm-missing" aria-labelledby="docsMissingH"><h3 id="docsMissingH">Missing</h3><ul id="docsMissing" class="doc-missing"></ul></section>'
+ +'<p id="docsMsg" class="muted" role="status" aria-live="polite"></p>'
+ +'<div class="form-foot dm-foot"><button class="btn ghost" type="button" data-close="docsModal" id="docsBack"'+(page==='clients'?'':' hidden')+'>← Back to client</button><button class="btn navy" type="button" data-close="docsModal" data-autofocus>Close</button></div></div>';})();
+function canEditApp(a){var c=clientById(a.clientId);if(!c||!can('clients','edit'))return false;return SUPER||c.assignedAdminId===ME0||TEAM.indexOf(c.assignedAdminId)>-1;}
+
+function sendReminder(a,auto){var c=clientById(a.clientId);if(!c)return '';var i=S.dueInfo(data,a);a.remindedAt=new Date().toISOString();
+ S.log(data,'Reminder Sent','Applications',S.clientName(c),(auto?'Automatic email reminder to ':'Email reminder to ')+c.email+': '+i.missing+' document'+(i.missing===1?'':'s')+' due '+(i.due||'—')+' ('+a.type+')',auto?{id:'',name:'System',role:'System'}:undefined);S.save(data);return c.email;}
+function remindUI(a){var em=sendReminder(a,false);if(em)toast('Reminder emailed to '+em);return em;}
+function fmtShort(iso){var m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];var p=String(iso||'').split('-');return p.length===3?m[+p[1]-1]+' '+(+p[2])+', '+p[0]:(iso||'—');}
+function dueChip(i){if(!i.due)return '—';var t=esc(fmtShort(i.due));if(i.state==='overdue')return t+' <span class="due-chip over">'+(-i.days)+'d overdue</span>';if(i.state==='soon')return t+' <span class="due-chip soon">'+(i.days===0?'today':'in '+i.days+'d')+'</span>';return t;}
 function openModal(id,ret){var m=$(id);modalStack=modalStack.filter(function(x){return x.id!==id;});modalStack.push({id:id,ret:ret||document.activeElement});lastFocus=ret||document.activeElement;m.hidden=false;var f=m.querySelector('[data-autofocus]')||m.querySelector('input,select,textarea,button');if(f)f.focus();}
 function closeModal(id){$(id).hidden=true;var i=-1;modalStack.forEach(function(x,k){if(x.id===id)i=k;});var ret=i>-1?modalStack[i].ret:lastFocus;if(i>-1)modalStack.splice(i,1);if(ret&&!document.contains(ret)&&ret.getAttribute&&ret.getAttribute('data-app'))ret=document.querySelector('[data-app="'+ret.getAttribute('data-app')+'"]');if(ret&&ret.focus&&document.contains(ret))ret.focus();}
 document.querySelectorAll('.modal-back').forEach(function(m){m.addEventListener('mousedown',function(e){m._down=e.target===m;});m.addEventListener('click',function(e){if(e.target===m&&m._down&&m.id==='addAppModal')closeModal(m.id);});});
@@ -83,7 +107,7 @@ document.querySelectorAll('[data-admin-name]').forEach(function(el){el.textConte
 function typeCountry(n){var v=(data.visas||[]).find(function(x){return x.name===n;});return S.visaCountry(v);}
 function counselorOf(a){return a?S.adminById(data,a.counselorId):null;}
 function counselorHtml(a){var c=counselorOf(a);if(!c)return '';return '<p class="counselor">'+staffAv(c,'md cn-av')+'<span>Education Counselor: <strong>'+esc(S.adminName(c))+'</strong></span></p>';}
-/* Active = still in progress (New, Active, Submitted, Review). Closed outcomes are excluded: Approved, Denied, Cancelled (withdrawn). */
+/* Active = New, In progress or Submitted. Approved, Denied and Closed are excluded. */
 var CLOSED_STATUSES=['Approved','Denied','Cancelled','Withdrawn','Closed'];
 function isActiveApp(a){return CLOSED_STATUSES.indexOf(a.status)<0;}
 function visaOptions(sel){return S.distinctTypes(data).map(function(n){return '<option value="'+esc(n)+'"'+(n===sel?' selected':'')+'>'+esc(n)+' — '+esc(typeCountry(n))+'</option>';}).join('');}
@@ -95,11 +119,23 @@ function populateEffective(typeName,sel){var recs=S.visasOfType(data,typeName).f
 function selectedVisa(sel){return data.visas.find(function(v){return v.id===sel.value;})||null;}
 
 /* ================= CLIENT ================= */
+function hasDecision(a){return (a.status==='Approved'||a.status==='Denied')&&a.decision;}
+function decisionCard(a){if(!hasDecision(a))return '';var d=a.decision,ok=a.status==='Approved';
+ return '<section class="decision-card '+(ok?'ok':'no')+'" aria-labelledby="decCardH"><div class="dc-top"><span class="dc-ic" aria-hidden="true">'+(ok?'✓':'✕')+'</span><div><p class="dc-k">Decision</p><h3 id="decCardH">'+(ok?'Approved':'Denied')+'</h3><p class="muted">Decision date: '+esc(d.date?fmtDate(d.date):'—')+'</p></div></div>'
+  +(d.note?'<p class="dc-note">'+esc(d.note)+'</p>':'')+(d.file?'<div class="dc-file"><span><strong>'+esc(d.file.name)+'</strong> <span class="muted">'+esc(fmtSize(d.file.size||0))+'</span></span><button type="button" class="btn navy sm" id="decClientDl">View / Download</button></div>':'')+'</section>';}
+function decisionBanner(apps){return apps.filter(function(a){return hasDecision(a)&&!a.decision.seenAt;}).map(function(a){var ok=a.status==='Approved';
+ return '<div class="due-banner '+(ok?'good':'over')+'" role="status"><span class="db-ic" aria-hidden="true">'+(ok?'✓':'!')+'</span><div><strong>New decision: '+esc(a.type)+' '+(ok?'approved':'denied')+'</strong><span>The government decision'+(a.decision.date?' dated '+esc(fmtDate(a.decision.date)):'')+' is ready to view.</span></div><a class="btn navy sm" href="application.html?id='+esc(a.id)+'">View decision</a></div>';}).join('');}
+/* In-app due-date banner: one line per open application with missing documents. States: overdue (red), due within 7 days (amber), later (info). */
+function dueBanner(apps,link){return apps.map(function(a){var i=S.dueInfo(data,a);if(!i.missing||!i.due||(i.state!=='overdue'&&i.state!=='soon'&&i.state!=='ok'))return '';
+ var cls=i.state==='overdue'?'over':i.state==='soon'?'soon':'info',n=i.missing+' document'+(i.missing===1?'':'s');
+ var sub=i.state==='overdue'?'Overdue by '+(-i.days)+' day'+(i.days===-1?'':'s')+'. Please upload as soon as possible.':i.state==='soon'?(i.days===0?'Due today.':'Due in '+i.days+' day'+(i.days===1?'':'s')+'.'):'Upload them any time before the due date.';
+ return '<div class="due-banner '+cls+'" role="'+(cls==='info'?'status':'alert')+'"><span class="db-ic" aria-hidden="true">'+(cls==='info'?'i':'!')+'</span><div><strong>'+n+' due by '+esc(fmtDate(i.due))+'</strong><span>'+esc(a.type)+' · '+sub+(a.remindedAt?' Reminder emailed '+esc(fmtDate(a.remindedAt.slice(0,10)))+'.':'')+'</span></div>'+(link?'<a class="btn navy sm" href="application.html?id='+esc(a.id)+'">Upload now</a>':'')+'</div>';}).join('');}
 if(page==='client-dashboard'){
  var mine=data.applications.filter(function(a){return a.clientId===S.CLIENT_ID;});
  var me=clientById(S.CLIENT_ID);if(me&&$('welcomeName'))$('welcomeName').textContent=me.first;
  initCarousel(data.announcements||[]);
  $('appCards').innerHTML=mine.map(function(a){var p=S.progress(data,a);return '<article class="card"><p>'+badge(a.status)+' <span class="badge">'+esc(a.type)+'</span></p><h3><a href="application.html?id='+a.id+'">'+esc(a.type)+' application</a></h3><p class="muted">Started '+esc(a.date)+' · Effective '+esc(S.effectiveDateOf(data,a)||'—')+'</p><div class="bar" role="progressbar" aria-valuenow="'+p+'" aria-valuemin="0" aria-valuemax="100" aria-label="Checklist progress"><i style="width:'+p+'%"></i></div><p>'+p+'% complete</p><a class="btn navy" href="application.html?id='+a.id+'">Open application</a></article>';}).join('');
+ var bn=decisionBanner(mine)+dueBanner(mine,true);if(bn)$('appCards').insertAdjacentHTML('beforebegin','<div class="due-banners" id="dueBanners">'+bn+'</div>');
  if(!mine.length)$('appCards').innerHTML=emptyState('No applications yet','When your counselor opens an application for you, it will appear here.');
  wireReset();
 }
@@ -130,13 +166,15 @@ function fmtDate(iso){var m=['January','February','March','April','May','June','
 var EYE='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
 if(page==='application'){
  var id=new URLSearchParams(location.search).get('id')||'a1'; var app=appById(id)||data.applications[0]; var cl=S.ensureChecklist(data,app); S.save(data);
+ if(hasDecision(app)&&!app.decision.seenAt){app.decision.seenAt=new Date().toISOString();S.save(data);}
+ document.addEventListener('click',function(e){if(e.target&&e.target.id==='decClientDl')openDecisionFile(app);});
  var FL={'received':'Received','pending review':'Pending review','approved':'Approved','rejected':'Rejected'};
  function render(focusSel){ var p=S.progress(data,app); var done=cl.filter(function(x){return x.done;}).length;
   /* Header image: AI-generated still (Higgsfield gpt_image_2_5), disclosed in alt text. */
   $('appDetail').innerHTML='<div class="app-hero"><img src="../assets/portal/portal-app-1280.webp?v=20261022f" srcset="../assets/portal/portal-app-640.webp?v=20261022f 640w, ../assets/portal/portal-app-1280.webp?v=20261022f 1280w" sizes="(max-width: 900px) 100vw, 960px" width="1280" height="300" alt="AI-generated image: a folder, a pen and a notebook on a wooden desk"></div>'
-  +'<p>'+badge(app.status)+' <span class="badge">'+esc(app.type)+'</span></p><h2>'+esc(app.type)+' application</h2><p class="muted">Started '+esc(app.date)+' · Effective '+esc(S.effectiveDateOf(data,app)||'—')+'</p>'+counselorHtml(app)
+  +dueBanner([app],false)+'<p>'+badge(app.status)+' <span class="badge">'+esc(app.type)+'</span></p><h2>'+esc(app.type)+' application</h2><p class="muted">Started '+esc(app.date)+' · Effective '+esc(S.effectiveDateOf(data,app)||'—')+(app.due?' · Documents due '+esc(fmtDate(app.due)):'')+'</p>'+counselorHtml(app)
   +'<div class="bar" role="progressbar" aria-valuenow="'+p+'" aria-valuemin="0" aria-valuemax="100" aria-label="Checklist progress"><i style="width:'+p+'%"></i></div><p><strong>'+p+'% complete</strong> · Checklist status: <strong>'+(p===100?'Complete':'Incomplete')+'</strong> ('+done+' of '+cl.length+' done)</p>'
-  +(app.status==='Review'?'<p class="review-note">All required documents are uploaded. Your counselor is reviewing your application.</p>':'')
+  +decisionCard(app)+(app.status==='Submitted'?'<p class="review-note">Your application has been submitted to the government. We will let you know as soon as a decision arrives.</p>':app.status==='In progress'&&cl.length&&cl.every(function(r){return r.done;})?'<p class="review-note">All required documents are uploaded. Your counselor is reviewing them.</p>':'')
   +(cl.length?'<p class="muted">Requirements are based on your case type. You can upload more than one file for each requirement.</p><ul class="check" style="list-style:none;padding:0">'
   +cl.map(function(r,i){var d=S.docById(data,r.docId);var hasS=!!(d&&d.sample&&(d.sample.dataUrl||d.sample.name));var fs=r.files||[];
    return '<li class="card req'+(r.done?' is-done':'')+'" id="req-'+esc(r.docId)+'"><div class="req-top"><div class="req-main"><strong>'+(r.done?'✓ Done':'○ To do')+' — '+esc(r.label)+'</strong>'+(hasS?'<button type="button" class="icon-btn sample-btn" data-sample="'+esc(r.docId)+'" aria-label="View example document" title="View example"><span class="tip" aria-hidden="true">View example</span>'+EYE+'</button>':'')+'</div><div class="req-side"><label class="btn">'+(fs.length?'Upload more':'Upload')+'<input type="file" multiple data-upload="'+i+'" style="position:absolute;opacity:0;width:1px;height:1px" aria-label="Upload files for '+esc(r.label)+'"></label></div></div>'
@@ -211,26 +249,64 @@ function appDetailsHtml(a,visa){var c=clientById(a.clientId);function row(k,v){r
  var DOC_LABEL={'received':'Received','pending review':'Pending review','approved':'Approved','rejected':'Rejected','missing':'Missing'};
 function docPill(st){return '<span class="doc-pill doc-'+st.replace(' ','-')+'">'+DOC_LABEL[st]+'</span>';}
 var docsApp=null,pendingFile=null,onDocsChanged=null;
+var DEC_MAX=5*1024*1024;
+function fmtSize(n){return n>=1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB';}
+function openDecisionFile(a){var f=a.decision&&a.decision.file;if(!f)return;if(f.dataUrl){var l=document.createElement('a');l.href=f.dataUrl;l.download=f.name;document.body.appendChild(l);l.click();l.remove();return;}
+ var b=new Blob(['ISConnect demo placeholder\n\n'+f.name+'\nDecision: '+(a.decision.status||'')+' ('+(a.decision.date||'')+')\nThe original file was too large to keep in this browser demo.'],{type:'text/plain'});var u=URL.createObjectURL(b),l2=document.createElement('a');l2.href=u;l2.download=f.name.replace(/\.[A-Za-z0-9]+$/,'')+'.txt';document.body.appendChild(l2);l2.click();l2.remove();setTimeout(function(){URL.revokeObjectURL(u);},1000);}
+function renderDecision(a,ed){var el=$('docsDecision');if(!el)return;var on=a.status==='Approved'||a.status==='Denied';el.hidden=!on;if(!on){el.innerHTML='';return;}
+ var d=a.decision||{},f=d.file,c=clientById(a.clientId);
+ el.className='dm-decision '+(a.status==='Approved'?'ok':'no');
+ el.innerHTML='<div class="dec-head"><h3 id="decH">Government decision</h3>'+badge(a.status)+'</div>'
+  +'<div class="dec-file">'+(f?'<span class="dec-ic" aria-hidden="true">'+(/^image\//.test(f.type)?'IMG':'PDF')+'</span><div class="dec-fmeta"><strong>'+esc(f.name)+'</strong><span class="muted">'+esc(fmtSize(f.size||0))+' · uploaded '+esc(fmtShort((f.at||'').slice(0,10)))+'</span></div><div class="dec-acts"><button type="button" class="btn ghost sm" id="decView">View</button>'+(ed?'<label class="btn ghost sm dec-up">Replace<input type="file" id="decFile" accept="application/pdf,image/*" class="sr-only"></label><button type="button" class="icon-btn danger-icon" id="decDel" aria-label="Remove '+esc(f.name)+'" title="Remove">'+TRASH+'</button>':'')+'</div>'
+   :(ed?'<label class="dec-drop" for="decFile"><strong>Upload decision letter or visa</strong><span class="muted">PDF or image, 5 MB max</span><input type="file" id="decFile" accept="application/pdf,image/*"></label>':'<p class="muted">No decision file uploaded yet.</p>'))+'</div>'
+  +'<div class="dec-grid"><div><label for="decDate">Decision date</label><input type="date" id="decDate" value="'+esc(d.date||'')+'"'+(ed?'':' disabled')+'></div><div class="dec-note"><label for="decNote">Note for the client <span class="muted">(optional)</span></label><textarea id="decNote" rows="2" maxlength="500"'+(ed?'':' disabled')+' placeholder="e.g. Your visa has been issued. Collect your passport from the visa centre.">'+esc(d.note||'')+'</textarea></div></div>'
+  +(ed?'<div class="dec-foot"><button type="button" class="btn navy sm" id="decSave">Save decision details</button></div>':'');
+ function done(msg){S.save(data);renderDecision(a,ed);$('docsMsg').textContent=msg;if(onDocsChanged)onDocsChanged();}
+ if($('decView'))$('decView').addEventListener('click',function(){openDecisionFile(a);});
+ var fi=$('decFile');if(fi)fi.addEventListener('change',function(){var file=fi.files&&fi.files[0];if(!file||!canEditApp(a))return;
+  if(!(file.type==='application/pdf'||/^image\//.test(file.type))){$('docsMsg').textContent='Choose a PDF or an image file.';fi.value='';return;}
+  if(file.size>DEC_MAX){$('docsMsg').textContent=file.name+' is '+fmtSize(file.size)+'. The limit is 5 MB.';fi.value='';return;}
+  var rd=new FileReader();rd.onload=function(){a.decision=a.decision||{status:a.status,date:S.today()};var old=a.decision.file;
+   a.decision.file={name:file.name,type:file.type,size:file.size,at:new Date().toISOString(),dataUrl:rd.result};a.decision.at=new Date().toISOString();delete a.decision.seenAt;
+   S.log(data,'Upload','Applications',file.name,(old?'Replaced':'Uploaded')+' '+a.status.toLowerCase()+' decision for '+S.clientName(c)+' ('+a.type+')');
+   if(!S.save(data)){delete a.decision.file.dataUrl;}
+   done((old?'Replaced ':'Uploaded ')+file.name+'.');var v=$('decView');if(v)v.focus();};rd.readAsDataURL(file);});
+ if($('decDel'))$('decDel').addEventListener('click',function(){if(!canEditApp(a))return;var n=f.name;delete a.decision.file;S.log(data,'Delete','Applications',n,'Removed decision file for '+S.clientName(c)+' ('+a.type+')');done('Removed '+n+'.');var x=$('decFile');if(x)x.focus();});
+ if($('decSave'))$('decSave').addEventListener('click',function(){if(!canEditApp(a))return;var dt=$('decDate').value;if(!dt){$('docsMsg').textContent='Choose a decision date.';$('decDate').focus();return;}
+  a.decision=a.decision||{status:a.status};a.decision.date=dt;a.decision.note=$('decNote').value.trim();a.decision.status=a.status;S.log(data,'Edit','Applications',S.clientName(c),'Decision details saved: '+a.status+' on '+dt+' ('+a.type+')');done('Decision details saved.');toast('Decision details saved');});}
+
 /* Owner documents modal (clients page + dashboard overdue dialog). One row per uploaded file: status <select> saves immediately; trash asks to confirm. */
-function renderDocs(appId){var a=appById(appId);if(!a)return;docsApp=appId;var visa=S.visaFor(data,a);var cl=S.ensureChecklist(data,a);S.save(data);
- if($('docsDetails'))$('docsDetails').innerHTML=appDetailsHtml(a,visa);
- var got=[],miss=cl.filter(function(r){return !r.done;});cl.forEach(function(r){(r.files||[]).forEach(function(f,k){got.push({r:r,f:f,k:k});});});
- var vname=visa?visa.name+' (effective '+(visa.effective||'—')+')':a.type;
- $('docsTitle').textContent=a.type+' — documents';
- $('docsSub').innerHTML='Client: <strong>'+esc(S.clientName(clientById(a.clientId)))+'</strong> · Case type: <a href="visas.html">'+esc(vname)+'</a> · Country: <strong>'+esc(S.visaCountry(visa))+'</strong> · Education Counselor: <strong>'+esc((counselorOf(a)?S.adminName(counselorOf(a)):'—'))+'</strong> · '+badge(a.status);
- var nDone=cl.filter(function(r){return r.done;}).length;
- $('docsSummary').textContent=cl.length?(nDone+' of '+cl.length+' required documents received · '+got.length+' file'+(got.length===1?'':'s')+' uploaded'):'This visa has no required documents listed.';
- $('docsList').innerHTML=got.length?got.map(function(g){var f=g.f,key=esc(g.r.docId+':'+g.k);return '<li class="doc-row"><div class="doc-main"><strong>'+esc(g.r.label)+'</strong>'
-  +'<span class="muted">File: '+esc(f.name)+'</span></div>'
-  +'<div class="doc-side"><label class="sr-only" for="fs-'+key+'">Status for '+esc(f.name)+'</label><select class="doc-status-sel" id="fs-'+key+'" data-fstatus="'+key+'">'+S.FILE_STATUSES.map(function(st){return '<option value="'+st+'"'+(st===f.status?' selected':'')+'>'+DOC_LABEL[st]+'</option>';}).join('')+'</select>'
-  +'<span class="doc-date"><span class="muted">Submitted</span> '+esc(f.at||'—')+'</span>'
-  +'<button class="btn" type="button" data-dl="'+key+'">View / Download</button><button class="icon-btn danger-icon" type="button" data-fdel="'+key+'" aria-label="Delete '+esc(f.name)+'" title="Delete">'+TRASH+'</button></div></li>';}).join(''):'<li class="muted">No documents submitted yet.</li>';
- $('docsMissing').innerHTML=miss.length?miss.map(function(r){return '<li>'+docPill('missing')+' '+esc(r.label)+'</li>';}).join(''):'<li class="muted">None — every required document has been received.</li>';
- $('docsMissingWrap').hidden=!cl.length;
+function renderDocs(appId){var a=appById(appId);if(!a)return;docsApp=appId;var visa=S.visaFor(data,a);var cl=S.ensureChecklist(data,a);S.save(data);var c=clientById(a.clientId),ed=canEditApp(a),inf=S.dueInfo(data,a);
+ var got=[],miss=cl.filter(function(r){return !r.done||r.status==='rejected';});cl.forEach(function(r){(r.files||[]).forEach(function(f,k){got.push({r:r,f:f,k:k});});});
+ $('docsKicker').textContent=S.clientName(c);$('docsTitle').textContent=a.type;
+ var sts=S.STATUSES.slice();if(sts.indexOf(a.status)<0)sts.push(a.status);
+ var okSub=S.allApproved(data,a),hints=[];
+ function blocked(x){if(x===a.status)return '';if(x==='Submitted'&&!okSub)return 'approve all required documents first';if((x==='Approved'||x==='Denied')&&a.status!=='Submitted')return 'only after Submitted';return '';}
+ var ss=$('docsStatus');ss.innerHTML=sts.map(function(x){var b=blocked(x);return '<option value="'+esc(x)+'"'+(x===a.status?' selected':'')+(b?' disabled':'')+'>'+esc(x)+(b?' ('+b+')':'')+'</option>';}).join('');ss.disabled=!ed;
+ if(ed&&!okSub&&a.status!=='Submitted'&&S.OPEN(a))hints.push('Submitted is available once every required document is Approved. Approve all required documents first.');
+ if(ed&&(a.status==='New'||a.status==='In progress'))hints.push('Approved and Denied can be set after the application is Submitted to the government.');
+ var sh=$('docsStatusHint');sh.textContent=hints.join(' ');sh.hidden=!hints.length;
+ renderDecision(a,ed);
+ var rb=$('docsRemind');rb.hidden=!ed||S.WORK.indexOf(a.status)<0||!inf.missing;
+ function row(k,v,w){return '<div'+(w?' class="'+w+'"':'')+'><dt>'+k+'</dt><dd>'+v+'</dd></div>';}
+ $('docsMeta').innerHTML=row('Client',esc(S.clientName(c)))+row('Case type','<a href="visas.html">'+esc(a.type)+'</a> <span class="muted">(effective '+esc(S.effectiveDateOf(data,a)||'—')+')</span>')+row('Country',esc(S.visaCountry(visa)))+row('Education Counselor',esc(counselorOf(a)?S.adminName(counselorOf(a)):'—'))
+  +row('<label for="docsDue">Due date</label>',(ed?'<input type="date" id="docsDue" value="'+esc(a.due||'')+'" required> ':'')+'<span class="dm-due">'+(ed?dueChip(inf).replace(/^[^<]*/,''):dueChip(inf))+'</span>');
+ var nDone=cl.length-miss.length,pct=cl.length?Math.round(nDone/cl.length*100):100;$('docsBar').querySelector('i').style.width=pct+'%';$('docsBar').setAttribute('aria-valuenow',pct);
+ $('docsSummary').innerHTML=cl.length?'<strong>'+nDone+' of '+cl.length+'</strong> required documents received'+(inf.review?' · '+inf.review+' waiting for review':''):'This case type has no required documents listed.';
+ $('docsList').innerHTML=got.length?got.map(function(g){var f=g.f,key=esc(g.r.docId+':'+g.k);return '<li class="doc-row"><div class="doc-main"><strong>'+esc(g.r.label)+'</strong><span class="muted doc-file">'+esc(f.name)+'</span></div>'
+  +'<div class="doc-side"><label class="sr-only" for="fs-'+key+'">Status for '+esc(f.name)+'</label><select class="doc-status-sel" id="fs-'+key+'" data-fstatus="'+key+'"'+(ed?'':' disabled')+'>'+S.FILE_STATUSES.map(function(st){return '<option value="'+st+'"'+(st===f.status?' selected':'')+'>'+DOC_LABEL[st]+'</option>';}).join('')+'</select>'
+  +'<span class="doc-date">'+esc(fmtShort(f.at))+'</span>'
+  +'<button class="btn ghost sm" type="button" data-dl="'+key+'" aria-label="View or download '+esc(f.name)+'">View</button>'+(ed?'<button class="icon-btn danger-icon" type="button" data-fdel="'+key+'" aria-label="Delete '+esc(f.name)+'" title="Delete">'+TRASH+'</button>':'')+'</div></li>';}).join(''):'<li class="muted doc-empty">No documents submitted yet.</li>';
+ $('docsMissingH').textContent='Missing ('+miss.length+')';
+ $('docsMissing').innerHTML=miss.map(function(r){return '<li><span class="dm-miss-dot" aria-hidden="true"></span>'+esc(r.label)+(r.status==='rejected'?' <span class="muted">— rejected, new file needed</span>':'')+'</li>';}).join('');
+ $('docsMissingWrap').hidden=!miss.length;
  function find(key){var q=key.split(':');var r=cl.find(function(x){return x.docId===q[0];});return {r:r,f:r.files[+q[1]],k:+q[1]};}
  document.querySelectorAll('#docsList [data-dl]').forEach(function(b){b.addEventListener('click',function(){var g=find(b.getAttribute('data-dl'));downloadPlaceholder(a,g.r,visa,g.f);});});
- document.querySelectorAll('#docsList [data-fstatus]').forEach(function(sel){sel.addEventListener('change',function(){var g=find(sel.getAttribute('data-fstatus'));g.f.status=sel.value;S.syncRow(g.r);a.updatedAt=S.today();S.log(data,'Status change','Documents',g.f.name,'File marked '+DOC_LABEL[sel.value]+' for '+S.clientName(clientById(a.clientId)));S.save(data);$('docsMsg').textContent='Saved: '+g.f.name+' is now '+DOC_LABEL[sel.value]+'.';if(onDocsChanged)onDocsChanged();});});
- document.querySelectorAll('#docsList [data-fdel]').forEach(function(b){b.addEventListener('click',function(){var g=find(b.getAttribute('data-fdel'));pendingFile={appId:a.id,docId:g.r.docId,k:g.k};$('fileDeleteMsg').textContent='Delete “'+g.f.name+'” from '+g.r.label+'? This cannot be undone.';openModal('fileDeleteModal',b);});});}
+ document.querySelectorAll('#docsList [data-fstatus]').forEach(function(sel){sel.addEventListener('change',function(){if(!canEditApp(a))return;var g=find(sel.getAttribute('data-fstatus'));g.f.status=sel.value;S.syncRow(g.r);a.updatedAt=S.today();S.log(data,'Status change','Documents',g.f.name,'File marked '+DOC_LABEL[sel.value]+' for '+S.clientName(c));S.save(data);var k=sel.id;renderDocs(a.id);var n=$(k);if(n)n.focus();$('docsMsg').textContent='Saved: '+g.f.name+' is now '+DOC_LABEL[sel.value]+'.';if(onDocsChanged)onDocsChanged();});});
+ document.querySelectorAll('#docsList [data-fdel]').forEach(function(b){b.addEventListener('click',function(){var g=find(b.getAttribute('data-fdel'));pendingFile={appId:a.id,docId:g.r.docId,k:g.k};$('fileDeleteMsg').textContent='Delete “'+g.f.name+'” from '+g.r.label+'? This cannot be undone.';openModal('fileDeleteModal',b);});});
+ var dd=$('docsDue');if(dd)dd.addEventListener('change',function(){if(!canEditApp(a))return;var v=dd.value;if(!v||isNaN(Date.parse(v))){$('docsMsg').textContent='Choose a valid due date.';return;}var o=a.due;a.due=v;a.dueSetBy=ME0;a.updatedAt=S.today();S.log(data,'Edit','Applications',S.clientName(c),'Due date '+(o||'—')+' → '+v+' ('+a.type+')');S.save(data);renderDocs(a.id);$('docsDue').focus();$('docsMsg').textContent='Due date saved: '+fmtShort(v)+'.';if(onDocsChanged)onDocsChanged();});}
+if($('docsStatus')){$('docsStatus').addEventListener('change',function(){var a=appById(docsApp);if(!a||!canEditApp(a))return;var o=a.status,v=this.value;if(o===v)return;if((v==='Submitted'&&!S.allApproved(data,a))||((v==='Approved'||v==='Denied')&&o!=='Submitted')){this.value=o;$('docsMsg').textContent=v==='Submitted'?'Approve all required documents first.':'Approved or Denied can only follow Submitted.';return;}a.status=v;if(v==='Approved'||v==='Denied'){a.decision=a.decision||{};a.decision.status=v;a.decision.date=a.decision.date||S.today();a.decision.at=new Date().toISOString();delete a.decision.seenAt;}a.updatedAt=S.today();S.log(data,'Status change','Applications',S.clientName(clientById(a.clientId)),a.type+': '+o+' → '+v);S.save(data);renderDocs(a.id);$('docsStatus').focus();$('docsMsg').textContent='Status changed from '+o+' to '+v+'.';toast('Status changed to '+v);if(onDocsChanged)onDocsChanged();});
+ $('docsRemind').addEventListener('click',function(){var a=appById(docsApp);if(!a||!canEditApp(a))return;var em=remindUI(a);$('docsMsg').textContent=em?'Reminder emailed to '+em+'.':'';if(onDocsChanged)onDocsChanged();});}
 function openDocs(appId,opener){renderDocs(appId);openModal('docsModal',opener);}
 if($('confirmFileDelete'))$('confirmFileDelete').addEventListener('click',function(){if(!pendingFile)return;var a=appById(pendingFile.appId),cl=S.ensureChecklist(data,a),r=cl.find(function(x){return x.docId===pendingFile.docId;});
  var f=r.files.splice(pendingFile.k,1)[0];S.syncRow(r);var was=a.status;S.syncReview(data,a);a.updatedAt=S.today();S.log(data,'Delete','Documents',f.name,'Removed submitted file for '+S.clientName(clientById(a.clientId)));S.save(data);pendingFile=null;
@@ -267,17 +343,17 @@ function drawDash(){charts.forEach(function(c){c.destroy();});charts=[];SC=getSc
  C=data.clients.filter(function(c){return VI?VI.indexOf(c.assignedAdminId)>-1:inScope(c,SC);});var ids={};C.forEach(function(c){ids[c.id]=1;});
  A=data.applications.filter(function(a){return ids[a.clientId];});share=data.clients.length?C.length/data.clients.length:0;
  if($('scopeNote'))$('scopeNote').textContent=VI?'Showing the '+C.length+' clients for '+viewLabel()+'.':SC==='all'?'Showing all '+C.length+' clients across the team.':SC==='team'?'Showing the '+C.length+' clients assigned to you and your team.':'Showing the '+C.length+' clients assigned to you.';
-function awaitingApps(){return A.filter(function(a){return S.progress(data,a)<100;});}
+function awaitingApps(){return A.filter(function(a){return S.WORK.indexOf(a.status)>-1&&S.progress(data,a)<100;});}
  function byType(list){var o={};list.forEach(function(a){o[a.type]=(o[a.type]||0)+1;});return Object.keys(o).sort(function(x,y){return o[y]-o[x];}).map(function(k){return [k,o[k]];});}
  function table(cap,head,rows){return '<table class="sr-only"><caption>'+esc(cap)+'</caption><thead><tr>'+head.map(function(h){return '<th>'+esc(h)+'</th>';}).join('')+'</tr></thead><tbody>'+rows.map(function(r){return '<tr>'+r.map(function(c){return '<td>'+esc(c)+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table>';}
  var keys=S.monthKeys(12),M=data.metrics||{revenue:{},clients:{}};
  var rev=keys.map(function(k){return Math.round((M.revenue[k]||0)*share/50)*50;});
  var cli=keys.map(function(k,i){return i===keys.length-1?C.length:Math.round((M.clients[k]||0)*share);});
  var curRev=rev[rev.length-1],total12=rev.reduce(function(x,y){return x+y;},0);
- var actives=A.filter(function(a){return a.status==='Active';});
+ var ACT3=['New','In progress','Submitted'];var actives=A.filter(function(a){return ACT3.indexOf(a.status)>-1;});
  var awaiting=awaitingApps();
  /* KPI cards (revenue card = current month of the revenue chart) */
- $('kpis').innerHTML=[['Revenue · '+monLabel(keys[11]),money(curRev),'12-month total '+money(total12)],['Total clients',C.length,VI?(VIEW.charAt(0)==='m'?'Team total, live':'Assigned to this staff member, live'):SC==='all'?'Month-end total, live':SC==='team'?'You and your team, live':'Assigned to you, live'],['Active cases',actives.length,'Status: Active'],['Awaiting documents',awaiting.length,'Required documents still missing']]
+ $('kpis').innerHTML=[['Revenue · '+monLabel(keys[11]),money(curRev),'12-month total '+money(total12)],['Total clients',C.length,VI?(VIEW.charAt(0)==='m'?'Team total, live':'Assigned to this staff member, live'):SC==='all'?'Month-end total, live':SC==='team'?'You and your team, live':'Assigned to you, live'],['Active cases',actives.length,'New, in progress or submitted'],['Awaiting documents',awaiting.length,'Required documents still missing']]
   .map(function(k){return '<article class="s-card kpi"><p class="kpi-label">'+esc(k[0])+'</p><p class="kpi-value">'+esc(k[1])+'</p><p class="kpi-sub">'+esc(k[2])+'</p></article>';}).join('');
  /* ---- Charts ---- */
  function extTooltip(ctx){var el=$('chartTip');var t=ctx.tooltip;if(!t||t.opacity===0){el.hidden=true;return;}
@@ -324,7 +400,7 @@ function awaitingApps(){return A.filter(function(a){return S.progress(data,a)<10
  $('actTable').innerHTML=table('Active cases by case type',['Case type','Cases'],byType(actives));
  $('awTable').innerHTML=table('Cases awaiting documents by case type',['Case type','Cases'],byType(awaiting));
  /* stacked bar: cases by status per month (segment colour == status pill dot colour, see owner-shad.css) */
- var STC={New:'#a1a1aa',Submitted:'#6b85ad',Review:'#0f766e',Active:'#0b1626',Approved:'#4482c1',Denied:'#dc2626',Cancelled:'#d4d4d8'},EXTRA=['#2a609b','#9cc0e6','#71717a'];
+ var STC={New:'#a1a1aa','In progress':'#0b1626',Submitted:'#6b85ad',Approved:'#15803d',Denied:'#dc2626',Closed:'#d4d4d8'},EXTRA=['#2a609b','#9cc0e6','#71717a'];
  var sts=S.STATUSES.slice();A.forEach(function(a){if(a.status&&sts.indexOf(a.status)<0)sts.push(a.status);});
  var live={};A.forEach(function(a){live[a.status]=(live[a.status]||0)+1;});
  var stH=keys.map(function(k,i){return i===keys.length-1?live:scaleSt((M.status||{})[k]||{});});
@@ -342,12 +418,12 @@ function awaitingApps(){return A.filter(function(a){return S.progress(data,a)<10
  lab('stChart','Stacked bar chart of cases by status for each of the last 12 months. This month: '+sts.map(function(st){return st+' '+(live[st]||0);}).join(', ')+'; total '+tots[11]+'.');
  $('stTable').innerHTML=table('Cases by status per month',['Month'].concat(sts,['Total']),keys.map(function(k,i){return [monLabel(k)].concat(sts.map(function(st){return stH[i][st]||0;}),[tots[i]]);}));
  /* ---- Overdue ---- */
- var today=S.today();var overdue=A.filter(function(a){return a.due&&a.due<today&&a.status!=='Approved'&&a.status!=='Cancelled';})
+ var today=S.today();var overdue=A.filter(function(a){return S.dueInfo(data,a).state==='overdue';})
   .map(function(a){return {a:a,days:Math.round((Date.parse(today)-Date.parse(a.due))/864e5)};}).sort(function(x,y){return y.days-x.days;});
  $('overdueCount').textContent=overdue.length?overdue.length+' case'+(overdue.length===1?'':'s'):'';
  $('overdue').innerHTML=overdue.length?overdue.map(function(o){var a=o.a;return '<tr class="row-link" tabindex="0" data-app="'+esc(a.id)+'" aria-label="'+esc(S.clientName(clientById(a.clientId))+', '+a.type+', '+o.days+' days overdue. Open details')+'">'
    +'<td data-label="Client"><span class="cell-strong">'+esc(S.clientName(clientById(a.clientId)))+'</span></td><td data-label="Case type">'+esc(a.type)+'</td><td data-label="Status">'+badge(a.status)+'</td><td data-label="Due date">'+esc(a.due)+'</td>'
-   +'<td data-label="Days overdue" class="num"><span class="s-badge destructive">'+o.days+' days</span></td></tr>';}).join(''):'<tr><td colspan="5" class="muted">No overdue cases.</td></tr>';
+   +'<td data-label="Days overdue" class="num"><span class="s-badge destructive">'+o.days+' day'+(o.days===1?'':'s')+'</span></td></tr>';}).join(''):'<tr><td colspan="5" class="muted">No overdue cases.</td></tr>';
  document.querySelectorAll('#overdue [data-app]').forEach(function(tr){function go(){openDocs(tr.getAttribute('data-app'),tr);}tr.addEventListener('click',go);tr.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go();}});});
  /* ---- Recent applicants (10 per page) ---- */
  var recent=A.slice().reverse(),PER=10,pg=1,pages=Math.max(1,Math.ceil(recent.length/PER));
@@ -362,14 +438,14 @@ function awaitingApps(){return A.filter(function(a){return S.progress(data,a)<10
  renderRecent();
  drawExtras();
 }
-function drawExtras(){var el=$('dashExtra');if(!el)return;var ACTIVE={New:1,Active:1,Submitted:1,Review:1};
+function drawExtras(){var el=$('dashExtra');if(!el)return;var ACTIVE={New:1,'In progress':1,Submitted:1};
  function bars(rows){var mx=Math.max.apply(null,rows.map(function(r){return r[1];}).concat([1]));return '<ul class="hbars">'+rows.map(function(r){return '<li><span class="hb-l">'+esc(r[0])+'</span><span class="hb-t"><span class="hb-f" style="width:'+Math.round(r[1]/mx*100)+'%"></span></span><b>'+r[1]+'</b></li>';}).join('')+'</ul>';}
  var since=Date.now()-30*864e5;
  function acts(id){return (data.logs||[]).filter(function(l){return l.actorId===id&&Date.parse(l.at)>=since;}).length;}
  function logRows(list){return list.length?list.map(function(l){return '<li><span class="act-who">'+esc(l.actor)+'</span> <span class="muted">'+esc(l.action.toLowerCase())+'</span> '+esc(l.target)+'<span class="act-when muted">'+esc(new Date(l.at).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}))+'</span></li>';}).join(''):'<li class="muted">No activity yet.</li>';}
  var VI=viewIds();var logs=(data.logs||[]).filter(function(l){return VI?VI.indexOf(l.actorId)>-1:(SUPER||!MGR||TEAM.indexOf(l.actorId)>-1);}).sort(function(a,b){return a.at<b.at?1:-1;});
  if(SUPER||MGR){
-  var ST=['New','Active','Submitted','Review','Approved','Denied','Cancelled'];
+  var ST=S.STATUSES.slice();
   var byS=ST.map(function(s){return [s,A.filter(function(a){return a.status===s;}).length];});
   var cs={};A.forEach(function(a){var v=S.visaFor?S.visaFor(data,a):null;var k=v?S.visaCountry(v):'—';cs[k]=(cs[k]||0)+1;});
   var byC=Object.keys(cs).map(function(k){return [k,cs[k]];}).sort(function(a,b){return b[1]-a[1];});
@@ -382,7 +458,7 @@ function drawExtras(){var el=$('dashExtra');if(!el)return;var ACTIVE={New:1,Acti
    +'<section class="s-card dash-sec"><div class="sec-head"><div class="s-card-head"><h2>'+(VIEW.charAt(0)==='s'?'Recent activity':SUPER&&!VI?'Recent activity':'Team activity')+'</h2></div>'+(can('logs','view')?'<a href="logs.html">View all activity</a>':'')+'</div><ul class="act-list">'+logRows(logs.slice(0,8))+'</ul></section>';
  }else{
   var mine=logs.filter(function(l){return l.actorId===ME0;});
-  var k=[['Active applications',A.filter(function(a){return ACTIVE[a.status];}).length,'New, active, submitted or in review'],['Approved',A.filter(function(a){return a.status==='Approved';}).length,'All time, your clients'],['Submitted',A.filter(function(a){return a.status==='Submitted'||a.status==='Review';}).length,'Submitted or in review'],['Your actions',acts(ME0),'Last 30 days']];
+  var k=[['Active applications',A.filter(function(a){return ACTIVE[a.status];}).length,'New, in progress or submitted'],['Approved',A.filter(function(a){return a.status==='Approved';}).length,'All time, your clients'],['Submitted',A.filter(function(a){return a.status==='Submitted';}).length,'Sent to the government, awaiting decision'],['Your actions',acts(ME0),'Last 30 days']];
   el.innerHTML='<h2 class="dash-h2">Your performance</h2><div class="kpi-grid">'+k.map(function(x){return '<div class="s-card kpi"><p class="kpi-label">'+x[0]+'</p><p class="kpi-value">'+x[1]+'</p><p class="kpi-sub">'+x[2]+'</p></div>';}).join('')+'</div>'
    +'<section class="s-card dash-sec"><div class="s-card-head"><h2>Your recent activity</h2></div><ul class="act-list">'+logRows(mine.slice(0,8))+'</ul></section>';
  }}
@@ -391,6 +467,32 @@ viewSetup();drawDash();scopeToggle($('scopeSeg'),drawDash);
 }
 
 /* ================= OWNER: clients ================= */
+if(page==='admin-tasks'){
+ var TCOLS=[['client','Client'],['type','Case type'],['date','Date started'],['due','Due date'],['running','Running days','num'],['over','Days overdue','num'],['inc','Incomplete documents','num'],['rev','Documents for review','num']];
+ var tsort={k:'over',dir:-1},tcur=1,TPER=10;
+ function trow(a){var c=clientById(a.clientId),i=S.dueInfo(data,a),t=S.today();var st=a.date||a.createdAt||t;
+  return {a:a,c:c,i:i,client:S.clientName(c),type:a.type,date:st,due:i.due||'9999-12-31',running:Math.max(0,Math.round((Date.parse(t)-Date.parse(st))/864e5)),over:i.state==='overdue'?-i.days:0,inc:i.missing,rev:i.review};}
+ function tcmp(x,y){var k=tsort.k,d=tsort.dir,u=x[k],v=y[k];var r=typeof u==='number'?u-v:String(u).localeCompare(String(v));if(r)return r*d;if(k==='over'){r=x.due.localeCompare(y.due);if(r)return r;}return x.client.localeCompare(y.client);}
+ function thead(){$('tHead').innerHTML=TCOLS.map(function(c){var on=tsort.k===c[0];return '<th scope="col"'+(c[2]?' class="num"':'')+' aria-sort="'+(on?(tsort.dir>0?'ascending':'descending'):'none')+'"><button type="button" class="th-sort'+(on?' on':'')+'" data-sort="'+c[0]+'">'+c[1]+'<span class="sort-ar" aria-hidden="true">'+(on?(tsort.dir>0?'▲':'▼'):'↕')+'</span></button></th>';}).join('')+'<th scope="col"><span class="sr-only">Actions</span></th>';
+  var sm=$('tSortSel');if(sm){var ov=[];TCOLS.forEach(function(c){ov.push([c[0]+':1',c[1]+' ↑'],[c[0]+':-1',c[1]+' ↓']);});sm.innerHTML=ov.map(function(o){return '<option value="'+o[0]+'"'+(o[0]===tsort.k+':'+tsort.dir?' selected':'')+'>'+o[1]+'</option>';}).join('');}
+  document.querySelectorAll('#tHead [data-sort]').forEach(function(b){b.addEventListener('click',function(){var k=b.getAttribute('data-sort');if(tsort.k===k)tsort.dir=-tsort.dir;else{tsort.k=k;tsort.dir=1;}tcur=1;trender();var nb=document.querySelector('#tHead [data-sort="'+k+'"]');if(nb)nb.focus();});});}
+ function trender(){thead();var q=$('tSearch').value.trim().toLowerCase(),fs=$('tStatus').value;
+  var rows=data.applications.filter(function(a){var c=clientById(a.clientId);if(!c||!inScope(c))return false;if(fs==='__all')return true;if(fs)return a.status===fs;return S.OPEN(a);}).map(trow)
+   .filter(function(r){return !q||(r.client+' '+r.type).toLowerCase().indexOf(q)>-1;}).sort(tcmp);
+  var pages=Math.max(1,Math.ceil(rows.length/TPER));if(tcur>pages)tcur=pages;var pg=rows.slice((tcur-1)*TPER,tcur*TPER);
+  $('taskRows').innerHTML=pg.length?pg.map(function(r){var a=r.a,i=r.i,ed=canEditApp(a);return '<tr><td data-label="Client"><span class="cell-strong">'+esc(r.client)+'</span></td><td data-label="Case type">'+esc(r.type)+' '+badge(a.status)+'</td><td data-label="Date started">'+esc(fmtShort(r.date))+'</td>'
+   +'<td data-label="Due date">'+esc(i.due?fmtShort(i.due):'—')+(i.state==='soon'?' <span class="due-chip soon">'+(i.days===0?'today':'in '+i.days+'d')+'</span>':'')+'</td><td data-label="Running days" class="num">'+r.running+'</td>'
+   +'<td data-label="Days overdue" class="num">'+(r.over?'<span class="over-num">'+r.over+'</span>':'<span class="muted">0</span>')+'</td><td data-label="Incomplete documents" class="num">'+(r.inc?r.inc+' of '+i.total:'<span class="muted">0</span>')+'</td><td data-label="Documents for review" class="num">'+(r.rev?'<span class="rev-num">'+r.rev+'</span>':'<span class="muted">0</span>')+'</td>'
+   +'<td class="act-cell"><div class="row-acts">'+(ed&&r.inc&&S.WORK.indexOf(a.status)>-1?'<button type="button" class="icon-btn" data-remind="'+esc(a.id)+'" aria-label="Send reminder to '+esc(r.client)+'" title="Send reminder">'+BELL+'</button>':'')+'<button type="button" class="icon-btn" data-app="'+esc(a.id)+'" aria-label="View documents for '+esc(r.client)+', '+esc(r.type)+'" title="View documents">'+EYE+'</button></div></td></tr>';}).join(''):'<tr><td colspan="9" class="muted">No applications match.</td></tr>';
+  $('pageInfo').textContent='Page '+tcur+' of '+pages+' · '+rows.length+' application'+(rows.length===1?'':'s');$('prevPage').disabled=tcur<=1;$('nextPage').disabled=tcur>=pages;
+  document.querySelectorAll('#taskRows [data-app]').forEach(function(b){b.addEventListener('click',function(){openDocs(b.getAttribute('data-app'),b);});});
+  document.querySelectorAll('#taskRows [data-remind]').forEach(function(b){b.addEventListener('click',function(){var a=appById(b.getAttribute('data-remind'));if(a&&canEditApp(a))remindUI(a);});});}
+ onDocsChanged=function(){trender();};
+ $('tSortSel').addEventListener('change',function(){var q=this.value.split(':');tsort={k:q[0],dir:+q[1]};tcur=1;trender();$('tSortSel').focus();});
+ $('tSearch').addEventListener('input',function(){tcur=1;trender();});$('tStatus').addEventListener('change',function(){tcur=1;trender();});
+ scopeToggle($('scopeSeg'),function(){tcur=1;trender();});
+ $('prevPage').addEventListener('click',function(){tcur--;trender();});$('nextPage').addEventListener('click',function(){tcur++;trender();});trender();
+}
 if(page==='clients'){
  var per=20, cur=1, editingId=null;
  $('newVisaType').innerHTML=visaOptions(); $('editVisaType').innerHTML=visaOptions();
@@ -438,13 +540,15 @@ if(page==='clients'){
   var v=selectedVisa($('newEffective'));if(!v){$('addClientError').textContent='Cannot save: a case type with an effective date is needed first. Add one on the Case types page.';return;}
   var c={id:'c-'+Date.now(),first:first,middle:$('newMiddle').value.trim(),last:last,email:email,phone:$('newPhone').value.trim(),address:'',language:'',dob:'',assignedAdminId:$('newAdmin').value||ME,createdAt:S.today(),updatedAt:S.today()};
   if(!can('clients','add'))return;data.clients.push(c);S.log(data,'Create','Clients',S.clientName(c),'Added client with '+type+' application');
-  data.applications.push({id:'a-'+Date.now(),clientId:c.id,type:type,visaId:v.id,effectiveDate:v.effective,status:'New',date:S.today(),createdAt:S.today(),updatedAt:S.today(),progress:0});
+  data.applications.push({id:'a-'+Date.now(),clientId:c.id,type:type,visaId:v.id,effectiveDate:v.effective,status:'New',date:S.today(),due:S.defaultDue(data,null,v.effective),createdAt:S.today(),updatedAt:S.today(),progress:0});
   S.save(data); closeModal('addClientModal'); e.target.reset(); if(!inScope(c)){sessionStorage.setItem('isc_scope','all');scopeToggle($('scopeSeg'),function(){cur=1;render();});} cur=1; render();});
  $('editClientForm').addEventListener('submit',function(e){e.preventDefault();if(!can('clients','edit'))return;var c=clientById(editingId);var o={e:c.email,p:c.phone};c.email=$('editEmail').value.trim();c.phone=$('editPhone').value.trim();var na=$('editAdmin').value,moved=na&&na!==c.assignedAdminId;if(na)c.assignedAdminId=na;c.updatedAt=S.today();var dt=[];if(o.e!==c.email)dt.push('Email updated');if(o.p!==c.phone)dt.push('Phone updated');if(moved)dt.push('Reassigned to '+adminLabel(na));S.log(data,'Edit','Clients',S.clientName(c),dt.join('; ')||'Saved details');S.save(data);$('editMsg').textContent=moved?'Saved. Assigned to '+adminLabel(na)+'.':'Details saved.';render();});
  populateEffective($('editVisaType').value,$('editEffective'));
- $('editVisaType').addEventListener('change',function(){populateEffective($('editVisaType').value,$('editEffective'));$('editAppError').textContent='';});
- $('addAppForClient').addEventListener('click',function(){if(!editingId||!can('clients','edit'))return;$('addAppTitle').textContent='Add an application for '+S.clientName(clientById(editingId));$('editAppError').textContent='';openModal('addAppModal',$('addAppForClient'));});
- $('addAppForm').addEventListener('submit',function(ev){ev.preventDefault();if(!editingId||!can('clients','edit'))return;var v=selectedVisa($('editEffective'));if(!v){$('editAppError').textContent='Cannot add: a case type with an effective date is needed first. Add one on the Case types page.';return;}$('editAppError').textContent='';var a={id:'a-'+Date.now(),clientId:editingId,type:$('editVisaType').value,visaId:v.id,effectiveDate:v.effective,status:'New',date:S.today(),createdAt:S.today(),updatedAt:S.today(),progress:0};data.applications.push(a);S.log(data,'Create','Applications',S.clientName(clientById(editingId)),'Added '+a.type+' application');S.save(data);renderEditApps();render();closeModal('addAppModal');$('editMsg').textContent='';toast('Added '+a.type+' application for '+S.clientName(clientById(editingId)));});
+ function setDefDue(){var v=selectedVisa($('editEffective'));$('editDue').value=S.defaultDue(data,null,v&&v.effective);}
+ $('editVisaType').addEventListener('change',function(){populateEffective($('editVisaType').value,$('editEffective'));setDefDue();$('editAppError').textContent='';});
+ $('editEffective').addEventListener('change',setDefDue);
+ $('addAppForClient').addEventListener('click',function(){if(!editingId||!can('clients','edit'))return;$('addAppTitle').textContent='Add an application for '+S.clientName(clientById(editingId));$('editAppError').textContent='';setDefDue();openModal('addAppModal',$('addAppForClient'));});
+ $('addAppForm').addEventListener('submit',function(ev){ev.preventDefault();if(!editingId||!can('clients','edit'))return;var v=selectedVisa($('editEffective'));if(!v){$('editAppError').textContent='Cannot add: a case type with an effective date is needed first. Add one on the Case types page.';return;}var due=$('editDue').value;if(!due||isNaN(Date.parse(due))){$('editAppError').textContent='Choose a due date.';$('editDue').focus();return;}$('editAppError').textContent='';var a={id:'a-'+Date.now(),clientId:editingId,type:$('editVisaType').value,visaId:v.id,effectiveDate:v.effective,status:'New',date:S.today(),due:due,dueSetBy:ME0,createdAt:S.today(),updatedAt:S.today(),progress:0};data.applications.push(a);S.log(data,'Create','Applications',S.clientName(clientById(editingId)),'Added '+a.type+' application, documents due '+due);S.save(data);renderEditApps();render();closeModal('addAppModal');$('editMsg').textContent='';toast('Added '+a.type+' application for '+S.clientName(clientById(editingId)));});
  ['search','fStatus','fType'].forEach(function(id){$(id).addEventListener('input',function(){cur=1;render();});});
  scopeToggle($('scopeSeg'),function(){cur=1;render();});
  $('prevPage').addEventListener('click',function(){cur--;render();}); $('nextPage').addEventListener('click',function(){cur++;render();}); render();
@@ -532,7 +636,7 @@ if(page==='visas'){
  renderPicker(); render();
 }
 if(page==='logs'){
- var LPER=25,lpg=1,ACTS=['Login','Logout','Create','Edit','Delete','Status change','Upload','Permission change','Password Reset'];
+ var LPER=25,lpg=1,ACTS=['Login','Logout','Create','Edit','Delete','Status change','Upload','Permission change','Password Reset','Reminder Sent'];
  var LOGS=(data.logs||[]).filter(function(l){return SUPER||(MGR?TEAM.indexOf(l.actorId)>-1:l.actorId===ME0);});
  var users={};LOGS.forEach(function(l){users[l.actorId]=l.actor;});
  $('logUser').innerHTML='<option value="">All users</option>'+Object.keys(users).sort(function(a,b){return users[a]<users[b]?-1:1;}).map(function(k){return '<option value="'+esc(k)+'">'+esc(users[k])+'</option>';}).join('');

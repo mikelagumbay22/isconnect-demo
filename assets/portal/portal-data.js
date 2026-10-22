@@ -7,7 +7,8 @@
 (function(){
 "use strict";
 var KEY='isc_demo_v1', OLDKEY='isc_demo_v0';
-var STATUSES=['New','Active','Submitted','Review','Approved','Denied','Cancelled'];
+var STATUSES=['New','In progress','Submitted','Approved','Denied','Closed'];
+var ST_MAP={Active:'In progress',Review:'In progress',Cancelled:'Closed',Withdrawn:'Closed'};
 var CLIENT_ID=(function(){try{return sessionStorage.getItem('isc_demo_client')||'c0';}catch(e){return 'c0';}})();
 function alias(t){return t;}
 function today(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
@@ -71,8 +72,8 @@ function seed(){
   apps.push({id:'a-s'+j,clientId:'c'+j,type:vname(vid),visaId:vid,effectiveDate:'2026-01-01',status:stats[j%stats.length],date:dt,due:(j%4===0?'2026-09-':'2026-12-')+String((j%27)+1).padStart(2,'0'),createdAt:dt,updatedAt:dt,progress:[20,45,60,80,35,90,100,55][j%8]});}
  return {version:1,admins:ADMINS.slice(),clients:clients,applications:apps,checklists:{},
   tasks:tasksSeed(),announcements:announcementsSeed(),documents:docsSeed(),visas:vs,copyV:1,emailsV:1};}
-function load(){try{var raw=localStorage.getItem(KEY);if(raw){var d=JSON.parse(raw);if(d&&d.version===1){var ch=false;if(migrateDocs(d))ch=true;if(migrateMetrics(d))ch=true;if(migrateSamples(d))ch=true;if(migrateNames(d))ch=true;if(migrateAll(d))ch=true;if(migrateAdmins(d))ch=true;if(migrateRoles(d))ch=true;if(migrateTeam2Apps(d)){migrateRoles(d);ch=true;}if(ensureAssignments(d))ch=true;if(ch)save(d);return d;}}}catch(e){}
- var s=seed();migrateDocs(s);migrateMetrics(s);migrateSamples(s);migrateNames(s);migrateAll(s);migrateAdmins(s);migrateRoles(s);migrateTeam2Apps(s);save(s);return s;}
+function load(){try{var raw=localStorage.getItem(KEY);if(raw){var d=JSON.parse(raw);if(d&&d.version===1){var ch=false;if(migrateDocs(d))ch=true;if(migrateMetrics(d))ch=true;if(migrateSamples(d))ch=true;if(migrateNames(d))ch=true;if(migrateAll(d))ch=true;if(migrateAdmins(d))ch=true;if(migrateRoles(d))ch=true;if(migrateTeam2Apps(d)){migrateRoles(d);ch=true;}if(migrateDue(d))ch=true;if(migrateStatus(d))ch=true;if(ensureAssignments(d))ch=true;if(ch)save(d);return d;}}}catch(e){}
+ var s=seed();migrateDocs(s);migrateMetrics(s);migrateSamples(s);migrateNames(s);migrateAll(s);migrateAdmins(s);migrateRoles(s);migrateTeam2Apps(s);migrateDue(s);migrateStatus(s);save(s);return s;}
 function save(d){try{ensureAssignments(d);mergeThreads(d);localStorage.setItem(KEY,JSON.stringify(d));return true;}catch(e){if(window.console)console.warn('ISConnect: could not save (storage full?)');return false;}}
 function reset(){localStorage.removeItem(KEY);return load();}
 /* adminsV:1 — guarantees data.admins and a valid assignedAdminId on every client (new clients default to the admin who adds them). */
@@ -154,7 +155,7 @@ function can(d,id,area,act){var a=adminById(d,id);if(!a)return false;if(a.role==
 function actorNow(d){var r='';try{r=sessionStorage.getItem('isc_demo_role')||'';}catch(e){}if(r==='client'){var c=(d.clients||[]).filter(function(x){return x.id===CLIENT_ID;})[0];return {id:CLIENT_ID,name:c?clientName(c):'Client',role:'Client'};}
  var a=adminById(d,currentAdminId());return {id:a?a.id:'',name:a?adminName(a):'System',role:a?roleLabel(d,a.role):'System'};}
 /* log(d, action, area, target, detail) — action: Login | Logout | Create | Edit | Delete | Status change | Upload | Permission change */
-function log(d,action,area,target,detail){if(!Array.isArray(d.logs))d.logs=[];var who=actorNow(d);
+function log(d,action,area,target,detail,actor){if(!Array.isArray(d.logs))d.logs=[];var who=actor||actorNow(d);
  d.logs.push({id:'l-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),at:new Date().toISOString(),actorId:who.id,actor:who.name,role:who.role,action:action,area:area,target:target||'',detail:detail||''});
  if(d.logs.length>3000)d.logs=d.logs.slice(-3000);}
 function seedLogs(d,only,cnt,pre,sd){var out=[],seed=sd||7;function rnd(){seed=(seed*16807)%2147483647;return (seed-1)/2147483646;}function pick(a){return a[Math.floor(rnd()*a.length)];}
@@ -164,7 +165,7 @@ function seedLogs(d,only,cnt,pre,sd){var out=[],seed=sd||7;function rnd(){seed=(
   var a=pick(admins),r=rnd(),e={id:pre+i,at:t.toISOString(),actorId:a.id,actor:adminName(a),role:roleLabel(d,a.role||'staff')};
   var tm=teamIds(d,a.id);var mine=cl.filter(function(c){return a.role==='super'||tm.indexOf(c.assignedAdminId)>-1;});var c=pick(mine.length?mine:cl);
   if(r<.22){e.action='Login';e.area='Account';e.target=adminName(a);e.detail='Signed in';}
-  else if(r<.40){var ap=apps.filter(function(x){return x.clientId===(c&&c.id);})[0]||pick(apps);e.action='Status change';e.area='Clients';e.target=clientName(c);e.detail=(ap?ap.type:'Application')+': '+pick(['New → Active','Active → Submitted','Submitted → Review','Review → Approved','Pending review → Approved','Received → Pending review']);}
+  else if(r<.40){var ap=apps.filter(function(x){return x.clientId===(c&&c.id);})[0]||pick(apps);e.action='Status change';e.area='Clients';e.target=clientName(c);e.detail=(ap?ap.type:'Application')+': '+pick(['New → In progress','In progress → Submitted','Submitted → Approved','Pending review → Approved','Received → Pending review']);}
   else if(r<.55){e.action='Edit';e.area='Clients';e.target=clientName(c);e.detail=pick(['Updated phone number','Updated email address','Updated contact details']);}
   else if(r<.63){e.action='Create';e.area='Clients';e.target=clientName(c);e.detail='Added application: '+pick(vs).name;}
   else if(r<.73){e.action=pick(['Edit','Edit','Upload']);e.area='Documents';var dc=pick(docs);e.target=dc?dc.name:'Document';e.detail=e.action==='Upload'?'Attached sample file':'Updated version to '+(dc?dc.version:'v1.0');}
@@ -236,7 +237,7 @@ function migrateMetrics(data){var ch=false;var M=data.metrics;if(!M||M.v!==1){M=
  /* status history (added later): data.metrics.status{'YYYY-MM':{status:n}} for past months, seeded once; current month is live */
  if(!M.status){M.status={};ch=true;}
  var sts=STATUSES.slice();(data.applications||[]).forEach(function(a){if(a.status&&sts.indexOf(a.status)<0)sts.push(a.status);});
- var w={New:.14,Submitted:.2,Active:.3,Approved:.2,Denied:.08,Cancelled:.08};
+ var w={New:.14,Submitted:.2,'In progress':.3,Approved:.2,Denied:.08,Closed:.08};
  keys.forEach(function(k,i){if(i===keys.length-1||M.status[k])return;var tot=Math.max(4,Math.round((M.clients[k]||n)*1.05));var o={};
   sts.forEach(function(st){var j=(hash('isc-st-'+k+'-'+st)%100)/100;o[st]=Math.max(0,Math.round(tot*(w[st]||.05)*(0.6+0.8*j)));});M.status[k]=o;ch=true;});
  return ch;}
@@ -270,14 +271,33 @@ function migrateNames(data){if(data.namesV>=1)return false;
 /* ---- filesV:1 — multiple uploads per requirement. row.files=[{name,at,status}], row.seq = last -NN used (never reused),
    row.done = files.length>0, row.status/submittedAt mirror the newest file for older code. */
 function fileName(data,app,r,ext,date){r.seq=(r.seq||0)+1;return stdName(data,app,r.docId,ext,date).replace(/(\.[a-z0-9]+)$/,'-'+String(r.seq).padStart(2,'0')+'$1');}
+/* Due dates (dueV:1). app.due (YYYY-MM-DD) = the date the client's required documents are due. Required on new applications
+   (default: the later of today and the effective date, + 60 days). One-time seed: demo apps get a spread relative to today
+   (overdue / due within 7 days / later); apps without a due date get created+60. Locally set due dates are kept (dueSetBy). */
+var DUE_SPREAD=[-14,4,30,-5,2,45,-21,6,60,-2,20,75];
+function defaultDue(data,app,eff){var base=eff||effectiveDateOf(data,app)||today();if(base<today())base=today();return addDays(base,60);}
+function migrateDue(d){if(d.dueV>=1||!Array.isArray(d.applications))return false;var t=today(),i=0;
+ d.applications.forEach(function(a){if(a.dueSetBy)return;var seeded=/^(a1|a2|a-s\d+|a-t2-\d+)$/.test(a.id);
+  if(seeded){a.due=addDays(t,DUE_SPREAD[i%DUE_SPREAD.length]);i++;}else if(!a.due)a.due=addDays(a.createdAt||a.date||t,60);});
+ d.dueV=1;return true;}
+var WORK_ST=['New','In progress'];
+/* every required document has an Approved latest file */
+function allApproved(data,a){var cl=ensureChecklist(data,a);return cl.every(function(r){var f=r.files&&r.files[r.files.length-1];return f?f.status==='approved':r.done&&r.status==='approved';});}
+/* statusV:1 — Active/Review -> In progress; Submitted stays only if all required docs Approved; Cancelled/Withdrawn -> Closed; history remapped. */
+function migrateStatus(d){if(d.statusV>=1||!Array.isArray(d.applications))return false;
+ (d.applications).forEach(function(a){var s=a.status;if(ST_MAP[s])a.status=ST_MAP[s];else if(s==='Submitted'&&!allApproved(d,a))a.status='In progress';delete a.reviewFrom;});
+ var M=d.metrics&&d.metrics.status;if(M)Object.keys(M).forEach(function(k){var o=M[k],n={};Object.keys(o).forEach(function(s){var t=ST_MAP[s]||s;n[t]=(n[t]||0)+o[s];});M[k]=n;});
+ d.statusV=1;return true;}
+var OPEN_ST=function(a){return ['Approved','Denied','Cancelled','Withdrawn','Closed'].indexOf(a.status)<0;};
+/* dueInfo: {due, days (due - today, negative = overdue), state: overdue|soon|ok|done|closed|none, missing, review, total} */
+function dueInfo(data,a){var cl=ensureChecklist(data,a),miss=cl.filter(function(r){return !r.done||r.status==='rejected';}).length,rev=0;
+ cl.forEach(function(r){(r.files||[]).forEach(function(f){if(f.status==='pending review')rev++;});});
+ var due=a.due||'',days=due?Math.round((Date.parse(due)-Date.parse(today()))/864e5):null,st;
+ if(!OPEN_ST(a))st='closed';else if(WORK_ST.indexOf(a.status)<0||!miss)st='done';else if(!due)st='none';else if(days<0)st='overdue';else if(days<=7)st='soon';else st='ok';
+ return {due:due,days:days,state:st,missing:miss,review:rev,total:cl.length,received:cl.length-miss};}
 function syncRow(r){r.files=r.files||[];r.done=r.files.length>0;var last=r.files[r.files.length-1];if(last){r.status=last.status;r.submittedAt=last.at;}else{delete r.status;delete r.submittedAt;}}
-/* Auto Review: every required doc has >=1 upload -> status 'Review' (previous status kept in reviewFrom); falls back when no longer complete. */
-var REVIEWABLE=['New','Active','Submitted'];
-function syncReview(data,app){var visa=visaFor(data,app);if(!visa||!visa.docIds.length)return false;var cl=ensureChecklist(data,app);
- var complete=cl.every(function(r){return r.files&&r.files.length;});
- if(complete&&REVIEWABLE.indexOf(app.status)>-1){app.reviewFrom=app.status;app.status='Review';app.updatedAt=today();return true;}
- if(!complete&&app.status==='Review'){app.status=app.reviewFrom||'Active';delete app.reviewFrom;app.updatedAt=today();return true;}
- return false;}
+/* New -> In progress once the client uploads anything. Never auto-submits. */
+function syncReview(data,app){if(app.status!=='New')return false;var cl=ensureChecklist(data,app);if(cl.some(function(r){return r.files&&r.files.length;})){app.status='In progress';app.updatedAt=today();return true;}return false;}
 function migrateFiles(data){if(data.filesV>=1)return false;
  (data.applications||[]).forEach(function(a){(data.checklists[a.id]||[]).forEach(function(r){if(!Array.isArray(r.files)){r.files=[];if(r.filename){var m=/^(.*?)(\.[A-Za-z0-9]+)$/.exec(r.filename)||[0,r.filename,'.pdf'];r.files.push({name:m[1]+'-01'+m[2].toLowerCase(),at:r.submittedAt||a.updatedAt||today(),status:r.status||'received'});r.seq=1;}}delete r.filename;syncRow(r);});});
  data.filesV=1;return true;}
@@ -335,5 +355,5 @@ function migrateAll(d){var ch=false;if(migrateThreads(d))ch=true;if(migrateFiles
 function trySave(d){return save(d);}
 function progress(data,app){var visa=visaFor(data,app);if(visa){if(!visa.docIds.length)return 100;var stored={};(data.checklists[app.id]||[]).forEach(function(r){stored[r.docId]=r;});var done=visa.docIds.filter(function(id){return stored[id]&&stored[id].done;}).length;return Math.round(done/visa.docIds.length*100);}return typeof app.progress==='number'?app.progress:0;}
 function clientName(c){return [c.first,c.middle,c.last].filter(Boolean).join(' ');}
-window.ISCStore={adminPhoto:adminPhoto,levels:levels,levelById:levelById,roleLabel:roleLabel,manages:manages,reportsTo:reportsTo,LEVELS:LEVELS,managers:managers,teamIds:teamIds,AREAS:AREAS,ACT_LABEL:ACT_LABEL,ROLE_LABEL:ROLE_LABEL,roleDefaults:roleDefaults,staffList:staffList,isSuper:isSuper,can:can,log:log,COUNSELORS:COUNSELORS,COUNTRIES:COUNTRIES,counselorById:counselorById,visaCountry:visaCountry,fileName:fileName,syncRow:syncRow,syncReview:syncReview,FILE_STATUSES:FILE_STATUSES,stdName:stdName,extOf:extOf,clientCode:clientCode,visaCode:visaCode,docCode:docCode,KEY:KEY,OLDKEY:OLDKEY,TYPES:TYPES,STATUSES:STATUSES,CLIENT_ID:CLIENT_ID,today:today,alias:alias,load:load,save:save,reset:reset,progress:progress,clientName:clientName,visaFor:visaFor,distinctTypes:distinctTypes,visasOfType:visasOfType,effectiveDateOf:effectiveDateOf,docById:docById,ensureChecklist:ensureChecklist,docStatus:docStatus,monthKeys:monthKeys,trySave:trySave,SAMPLE_MAX:SAMPLE_MAX,DOC_STATUSES:DOC_STATUSES,slug:slug,adminById:adminById,adminName:adminName,currentAdminId:currentAdminId,esc:function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}};
+window.ISCStore={allApproved:allApproved,WORK:WORK_ST,dueInfo:dueInfo,defaultDue:defaultDue,addDays:addDays,OPEN:OPEN_ST,adminPhoto:adminPhoto,levels:levels,levelById:levelById,roleLabel:roleLabel,manages:manages,reportsTo:reportsTo,LEVELS:LEVELS,managers:managers,teamIds:teamIds,AREAS:AREAS,ACT_LABEL:ACT_LABEL,ROLE_LABEL:ROLE_LABEL,roleDefaults:roleDefaults,staffList:staffList,isSuper:isSuper,can:can,log:log,COUNSELORS:COUNSELORS,COUNTRIES:COUNTRIES,counselorById:counselorById,visaCountry:visaCountry,fileName:fileName,syncRow:syncRow,syncReview:syncReview,FILE_STATUSES:FILE_STATUSES,stdName:stdName,extOf:extOf,clientCode:clientCode,visaCode:visaCode,docCode:docCode,KEY:KEY,OLDKEY:OLDKEY,TYPES:TYPES,STATUSES:STATUSES,CLIENT_ID:CLIENT_ID,today:today,alias:alias,load:load,save:save,reset:reset,progress:progress,clientName:clientName,visaFor:visaFor,distinctTypes:distinctTypes,visasOfType:visasOfType,effectiveDateOf:effectiveDateOf,docById:docById,ensureChecklist:ensureChecklist,docStatus:docStatus,monthKeys:monthKeys,trySave:trySave,SAMPLE_MAX:SAMPLE_MAX,DOC_STATUSES:DOC_STATUSES,slug:slug,adminById:adminById,adminName:adminName,currentAdminId:currentAdminId,esc:function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}};
 })();
