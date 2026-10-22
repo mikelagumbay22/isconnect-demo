@@ -8,7 +8,7 @@
 "use strict";
 var KEY='isc_demo_v1', OLDKEY='isc_demo_v0';
 var STATUSES=['New','Active','Submitted','Review','Approved','Denied','Cancelled'];
-var CLIENT_ID='c0';
+var CLIENT_ID=(function(){try{return sessionStorage.getItem('isc_demo_client')||'c0';}catch(e){return 'c0';}})();
 function alias(t){return t;}
 function today(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 var ADMINS=[{id:'adm-1',first:'Daniela',last:'Reyes',email:'daniela.reyes@example.com'},{id:'adm-2',first:'Marco',last:'Villanueva',email:'marco.villanueva@example.com'},{id:'adm-3',first:'Hannah',last:'Cruz',email:'hannah.cruz@example.com'}];
