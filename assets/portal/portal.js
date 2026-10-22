@@ -76,7 +76,8 @@ function scopeToggle(el,onChange){if(!el)return;if(SUPER||!can('clients','all'))
 window.ISCScope={get:getScope,toggle:scopeToggle,me:ME,has:function(c){return inScope(c);}};
 document.querySelectorAll('[data-admin-name]').forEach(function(el){el.textContent=S.adminName(S.adminById(data,ME));});
 function typeCountry(n){var v=(data.visas||[]).find(function(x){return x.name===n;});return S.visaCountry(v);}
-function counselorHtml(a){var c=S.counselorById(a&&a.counselorId);if(!c)return '';return '<p class="counselor"><picture><source type="image/webp" srcset="../assets/img/team/'+c.photo+'.webp?v=20261022f"><img src="../assets/img/team/'+c.photo+'.jpg?v=20261022f" width="40" height="40" alt="" decoding="async"></picture><span>Education Counselor: <strong>'+esc(c.name)+'</strong></span></p>';}
+function counselorOf(a){return a?S.adminById(data,a.counselorId):null;}
+function counselorHtml(a){var c=counselorOf(a);if(!c)return '';return '<p class="counselor">'+staffAv(c,'md cn-av')+'<span>Education Counselor: <strong>'+esc(S.adminName(c))+'</strong></span></p>';}
 /* Active = still in progress (New, Active, Submitted, Review). Closed outcomes are excluded: Approved, Denied, Cancelled (withdrawn). */
 var CLOSED_STATUSES=['Approved','Denied','Cancelled','Withdrawn','Closed'];
 function isActiveApp(a){return CLOSED_STATUSES.indexOf(a.status)<0;}
@@ -199,7 +200,7 @@ function openSample(doc,opener){var x=doc&&doc.sample;if(!x)return;if(sampleUrl)
  $('samplePreview').innerHTML=body;openModal('sampleModal',opener);}
 /* ---- Shared: application documents dialog (owner Clients + owner Dashboard). Needs #docsModal with the docs* ids. ---- */
 function appDetailsHtml(a,visa){var c=clientById(a.clientId);function row(k,v){return '<div><dt>'+k+'</dt><dd>'+v+'</dd></div>';}
- return '<dl class="detail-grid">'+row('Client',esc(S.clientName(c)))+row('Case type',esc(a.type))+row('Country',esc(S.visaCountry(visa)))+row('Education Counselor',esc((S.counselorById(a.counselorId)||{}).name||'—'))+row('Status',badge(a.status))
+ return '<dl class="detail-grid">'+row('Client',esc(S.clientName(c)))+row('Case type',esc(a.type))+row('Country',esc(S.visaCountry(visa)))+row('Education Counselor',esc((counselorOf(a)?S.adminName(counselorOf(a)):'—')))+row('Status',badge(a.status))
   +row('Effective',esc(S.effectiveDateOf(data,a)||'—'))+row('Created',esc(a.createdAt||a.date||'—'))+row('Updated',esc(a.updatedAt||a.createdAt||'—'))
   +(a.due?row('Due',esc(a.due)):'')+'</dl><p class="detail-notes"><span class="muted">Notes</span><br>'+esc((visa&&visa.notes)||'—')+'</p>';}
  var DOC_LABEL={'received':'Received','pending review':'Pending review','approved':'Approved','rejected':'Rejected','missing':'Missing'};
@@ -211,7 +212,7 @@ function renderDocs(appId){var a=appById(appId);if(!a)return;docsApp=appId;var v
  var got=[],miss=cl.filter(function(r){return !r.done;});cl.forEach(function(r){(r.files||[]).forEach(function(f,k){got.push({r:r,f:f,k:k});});});
  var vname=visa?visa.name+' (effective '+(visa.effective||'—')+')':a.type;
  $('docsTitle').textContent=a.type+' — documents';
- $('docsSub').innerHTML='Client: <strong>'+esc(S.clientName(clientById(a.clientId)))+'</strong> · Case type: <a href="visas.html">'+esc(vname)+'</a> · Country: <strong>'+esc(S.visaCountry(visa))+'</strong> · Education Counselor: <strong>'+esc((S.counselorById(a.counselorId)||{}).name||'—')+'</strong> · '+badge(a.status);
+ $('docsSub').innerHTML='Client: <strong>'+esc(S.clientName(clientById(a.clientId)))+'</strong> · Case type: <a href="visas.html">'+esc(vname)+'</a> · Country: <strong>'+esc(S.visaCountry(visa))+'</strong> · Education Counselor: <strong>'+esc((counselorOf(a)?S.adminName(counselorOf(a)):'—'))+'</strong> · '+badge(a.status);
  var nDone=cl.filter(function(r){return r.done;}).length;
  $('docsSummary').textContent=cl.length?(nDone+' of '+cl.length+' required documents received · '+got.length+' file'+(got.length===1?'':'s')+' uploaded'):'This visa has no required documents listed.';
  $('docsList').innerHTML=got.length?got.map(function(g){var f=g.f,key=esc(g.r.docId+':'+g.k);return '<li class="doc-row"><div class="doc-main"><strong>'+esc(g.r.label)+'</strong>'
@@ -407,7 +408,7 @@ if(page==='clients'){
   $('editApps').innerHTML=apps.length?apps.map(function(a){var n=docCount(a),eff=S.effectiveDateOf(data,a)||'—';
    return '<li><div class="app-card" role="button" tabindex="0" data-app="'+esc(a.id)+'" aria-label="'+esc(a.type+', '+a.status+', '+n+' document'+(n===1?'':'s')+'. Open documents')+'">'
    +'<div class="app-card-top"><span class="app-card-type">'+esc(a.type)+'</span>'+badge(a.status)+'</div>'
-   +'<dl class="app-card-meta"><div><dt>Counselor</dt><dd>'+esc((S.counselorById(a.counselorId)||{}).name||'—')+'</dd></div><div><dt>Effective</dt><dd>'+esc(eff)+'</dd></div><div><dt>Created</dt><dd>'+esc(a.createdAt||a.date)+'</dd></div><div><dt>Updated</dt><dd>'+esc(a.updatedAt||a.createdAt||a.date)+'</dd></div></dl>'
+   +'<dl class="app-card-meta"><div><dt>Counselor</dt><dd>'+esc((counselorOf(a)?S.adminName(counselorOf(a)):'—'))+'</dd></div><div><dt>Effective</dt><dd>'+esc(eff)+'</dd></div><div><dt>Created</dt><dd>'+esc(a.createdAt||a.date)+'</dd></div><div><dt>Updated</dt><dd>'+esc(a.updatedAt||a.createdAt||a.date)+'</dd></div></dl>'
    +'<div class="app-card-foot"><span>'+n+' document'+(n===1?'':'s')+'</span><span class="app-card-chev" aria-hidden="true">View documents ›</span></div></div></li>';}).join(''):'<li class="card">No applications yet.</li>';
   S.save(data);
   document.querySelectorAll('#editApps [data-app]').forEach(function(el){function go(){openDocs(el.getAttribute('data-app'),el);}

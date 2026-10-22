@@ -45,7 +45,11 @@ function visasSeed(){function v(id,code,name,notes,docIds){return {id:id,code:co
  v('v-uae-sv','UAESV','UAE Student Visa','Core document checklist for this case type.',['d1','d6','d5']),
  v('v-sg-sp','SGSP','Singapore Student Pass','Core document checklist for this case type.',['d1','d6','d5'])];}
 /* Education Counselors — names and headshots from the About page (Meet the Team). Each application has one counselorId. */
-var COUNSELORS=[{id:'ec-rica',name:'Rica Urbano',photo:'team-rica-338'},{id:'ec-celene',name:'Celene Garcia',photo:'team-celene-338'},{id:'ec-yeda',name:'Yeda Soriano',photo:'team-yeda-338'},{id:'ec-rae',name:'Gracie Rae Batongbakal',photo:'team-rae-338'}];
+var COUNSELORS=[{id:'ec-rica',first:'Rica',last:'Urbano',photo:'team-rica-338',mgr:'adm-4',ph:'0188'},{id:'ec-celene',first:'Celene',last:'Garcia',photo:'team-celene-338',mgr:'adm-4',ph:'0189'},{id:'ec-yeda',first:'Yeda',last:'Soriano',photo:'team-yeda-338',mgr:'adm-5',ph:'0190'},{id:'ec-rae',first:'Gracie Rae',last:'Batongbakal',photo:'team-rae-338',mgr:'adm-5',ph:'0191'}];
+COUNSELORS.forEach(function(c){c.name=c.first+' '+c.last;});
+/* Headshots in assets/img/team (About page, Meet the Team), keyed by the person's full name. The matching member uses it as their default avatar. */
+var HEADSHOTS={'emmanuel garcia':'team-em-338.jpg','mary grace ariola':'team-grace-338.jpg','alma armada':'team-alma-338.jpg','marijo garcia':'team-mj-338.jpg','rica urbano':'team-rica-338.jpg','celene garcia':'team-celene-338.jpg','yeda soriano':'team-yeda-338.jpg','gracie rae batongbakal':'team-rae-338.jpg'};
+var HEAD_FILES={};Object.keys(HEADSHOTS).forEach(function(k){HEAD_FILES[HEADSHOTS[k]]=1;});
 var COUNTRIES=['Canada','United Kingdom','Ireland','Germany','Spain','New Zealand','Singapore','United Arab Emirates','All countries'];
 var VISA_COUNTRY={'v-ca-sv':'Canada','v-ca-pgwp':'Canada','v-ca-dep':'Canada','v-ca-wp':'Canada','v-ca-pr':'Canada','v-uk-sv':'United Kingdom','v-uk-gr':'United Kingdom','v-ie-sv':'Ireland','v-de-sv':'Germany','v-es-sv':'Spain','v-nz-sv':'New Zealand','v-uae-sv':'United Arab Emirates','v-sg-sp':'Singapore'};
 function counselorById(id){return COUNSELORS.filter(function(c){return c.id===id;})[0]||null;}
@@ -127,9 +131,21 @@ function migrateRoles(d){var ch=false;if(!Array.isArray(d.admins))d.admins=[];d.
 /* teamV:1 — Team page: phone + photo per member, permissions per level (d.levelPerms), per-user overrides dropped, 'Super Admin' renamed 'Admin'. */
 var PHOTOS={'adm-0':'team-em-338.jpg','adm-4':'team-grace-338.jpg','adm-5':'team-alma-338.jpg'};
 var PHONES={'adm-0':'0180','adm-4':'0181','adm-5':'0182','adm-1':'0183','adm-2':'0184','adm-3':'0185','adm-6':'0186','adm-7':'0187'};
-function migrateTeam(d){var ch=false;
+/* Education Counselors are Team members (Staff level, with a manager). Merges into saved data: existing members, edits and uploads are kept. */
+function migrateCounselors(d){var ch=false;if(!Array.isArray(d.admins))d.admins=[];
+ COUNSELORS.forEach(function(c){var a=adminById(d,c.id);if(a)return;
+  a={id:c.id,first:c.first,last:c.last,email:(c.first.split(' ')[0]+'.'+c.last).toLowerCase()+'@isconnect.ca',phone:'(403) 555-'+c.ph,role:levelById(d,'staff')?'staff':(levels(d).filter(function(l){return l.reports;})[0]||{id:'staff'}).id};
+  if(d.admins.some(function(x){return String(x.email||'').toLowerCase()===a.email;}))a.email=c.id+'@isconnect.ca';
+  var ms=managers(d),m=ms.filter(function(x){return x.id===c.mgr;})[0]||ms[0];if(m&&reportsTo(d,a.role))a.managerId=m.id;
+  d.admins.push(a);ch=true;});
+ /* Default avatars follow the member's name: an asset headshot that belongs to someone else (e.g. a renamed member) is swapped for theirs, or cleared to initials. Uploaded photos and removals are kept. */
+ d.admins.forEach(function(a){var mine=HEADSHOTS[adminName(a).toLowerCase()]||'';
+  if(a.photo===undefined){if(mine){a.photo=mine;ch=true;}}
+  else if(a.photo&&HEAD_FILES[a.photo]&&a.photo!==mine){a.photo=mine;ch=true;}});
+ return ch;}
+function migrateTeam(d){var ch=false;if(migrateCounselors(d))ch=true;
  (d.admins||[]).forEach(function(a,i){if(!a.last&&a.first&&a.first.indexOf(' ')>0){var k=a.first.lastIndexOf(' ');a.last=a.first.slice(k+1);a.first=a.first.slice(0,k);ch=true;}
-  if(!a.phone){a.phone='(403) 555-'+(PHONES[a.id]||('01'+String(90+i%10)));ch=true;}if(a.photo===undefined&&PHOTOS[a.id]){a.photo=PHOTOS[a.id];ch=true;}});
+  if(!a.phone){a.phone='(403) 555-'+(PHONES[a.id]||('01'+String(90+i%10)));ch=true;}});
  if(d.perms){delete d.perms;ch=true;}
  if(!d.teamV){(d.logs||[]).forEach(function(l){if(l.role==='Super Admin')l.role='Admin';if(l.detail)l.detail=String(l.detail).replace(/Super Admin/g,'Admin');});d.teamV=1;ch=true;}
  return ch;}
