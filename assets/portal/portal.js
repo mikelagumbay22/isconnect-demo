@@ -9,28 +9,35 @@ function clientById(id){return data.clients.find(function(c){return c.id===id;})
 function badge(st){return '<span class="badge '+esc(st)+'">'+esc(st)+'</span>';}
 var PENCIL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>';
 var TRASH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m1 0-1 14H8L7 6"/></svg>';
-/* ---- Roles & permissions (Super Admin / Staff). The nav lists only pages the signed-in user may open; a disallowed page shows a no-access notice. ---- */
+/* ---- Roles & permissions (Admin / Staff). The nav lists only pages the signed-in user may open; a disallowed page shows a no-access notice. ---- */
 var IS_OWNER=document.body.getAttribute('data-role')==='owner',ME0=S.currentAdminId();
-var SUPER=S.isSuper(data,ME0);var ROLE0=(S.adminById(data,ME0)||{}).role||'staff';var MGR=ROLE0==='manager';var TEAM=S.teamIds(data,ME0);
+var SUPER=S.isSuper(data,ME0);var ROLE0=(S.adminById(data,ME0)||{}).role||'staff';var MGR=S.manages(data,ROLE0);var TEAM=S.teamIds(data,ME0);
 function can(area,act){return S.can(data,ME0,area,act);}
-var NAV=[['dashboard.html','Dashboard','dashboard'],['clients.html','Clients','clients'],['documents.html','Documents','documents'],['visas.html','Case types','casetypes'],['messages.html','Messages','messages'],['logs.html','Activity logs','logs'],['permissions.html','Permissions','_super']];
-var PAGE_AREA={'owner-dashboard':'dashboard',clients:'clients',documents:'documents',visas:'casetypes',messages:'messages',logs:'logs',permissions:'_super'};
+var NAV=[['dashboard.html','Dashboard','dashboard'],['clients.html','Clients','clients'],['documents.html','Documents','documents'],['visas.html','Case types','casetypes'],['messages.html','Messages','messages'],['logs.html','Activity logs','logs'],['team.html','Team','team']];
+var PAGE_AREA={'owner-dashboard':'dashboard',clients:'clients',documents:'documents',visas:'casetypes',messages:'messages',logs:'logs',team:'team'};
 function allowed(area){return area==='_super'?SUPER:can(area,'view');}
+function clientAv(c,cls){var n=((c&&c.first||'?').charAt(0)+((c&&c.last)||'').charAt(0)).toUpperCase();return c&&c.photo?'<span class="c-av '+(cls||'')+'"><img src="'+esc(c.photo)+'" alt=""></span>':'<span class="c-av '+(cls||'')+'" aria-hidden="true">'+esc(n)+'</span>';}
+function paintClientChrome(){if(IS_OWNER)return;var c=data.clients.find(function(x){return x.id===S.CLIENT_ID;});if(!c)return;
+ var sp=document.querySelector('.side > p');if(sp){var o=sp.querySelector('.c-av');if(o)o.remove();sp.classList.add('side-me');sp.insertAdjacentHTML('afterbegin',clientAv(c,'md'));}
+ var tb=document.querySelector('.topbar');if(tb){var t=tb.querySelector('.c-av');if(t)t.remove();var mb=tb.querySelector('[data-menu]');if(mb)mb.insertAdjacentHTML('beforebegin',clientAv(c,'sm tb-av'));}}
 function meName(){return IS_OWNER?S.adminName(S.adminById(data,ME0)):S.clientName(data.clients.find(function(c){return c.id===S.CLIENT_ID;})||{});}
 if(IS_OWNER){
- if(!S.adminById(data,ME0)){sessionStorage.removeItem('isc_demo_role');location.replace('../login.html');}
+ if(!S.adminById(data,ME0)||(S.adminById(data,ME0)||{}).role==='archive'){sessionStorage.removeItem('isc_demo_role');location.replace('../login.html');}
+ function goneChk(){try{var st=JSON.parse(localStorage.getItem('isc_demo_v1')||'{}');if(Array.isArray(st.admins)&&!st.admins.some(function(a){return a.id===ME0&&a.role!=='archive';})){sessionStorage.removeItem('isc_demo_role');sessionStorage.removeItem('isc_demo_admin');location.replace('../login.html');}}catch(x){}}
+ window.addEventListener('storage',function(e){if(!e.key||e.key==='isc_demo_v1')goneChk();});window.addEventListener('focus',goneChk);document.addEventListener('visibilitychange',goneChk);setInterval(goneChk,3000);
  var here=location.pathname.split('/').pop()||'dashboard.html',navOk=NAV.filter(function(n){return allowed(n[2]);});
  var navEl=document.querySelector('.side nav');
  if(navEl)navEl.innerHTML=navOk.map(function(n){var m=n[0]==='messages.html';return '<a href="'+n[0]+'"'+(m?' class="nav-msg"':'')+(n[0]===here?' aria-current="page"':'')+'>'+n[1]+(m?' <span class="nav-badge" id="navMsgBadge" hidden></span>':'')+'</a>';}).join('')+'<a href="../index.html">View public site</a><a href="#" data-signout>Sign out</a>';
- var sideP=document.querySelector('.side > p');if(sideP&&!sideP.querySelector('.role-tag'))sideP.insertAdjacentHTML('beforeend','<span class="role-tag">'+esc(S.ROLE_LABEL[ROLE0]||'Staff')+'</span>');
+ var sideP=document.querySelector('.side > p');if(sideP&&!sideP.querySelector('.role-tag'))sideP.insertAdjacentHTML('beforeend','<span class="role-tag">'+esc(S.roleLabel(data,ROLE0))+'</span>');
  var pArea=PAGE_AREA[page];
  if(pArea&&!allowed(pArea)){
   if(page==='owner-dashboard'&&navOk.length){location.replace(navOk[0][0]);}
   page='noaccess';document.body.setAttribute('data-page','noaccess');
   var mn=$('main'),ft=mn.querySelector('.mini-footer');
-  mn.innerHTML='<section class="no-access" role="alert"><h1>You don’t have access to this page</h1><p class="muted">Your account doesn’t include permission for this area. A Super Admin can change this on the Permissions page.</p>'+(navOk.length?'<p><a class="btn navy" href="'+navOk[0][0]+'">Go to '+esc(navOk[0][1])+'</a></p>':'')+'</section>'+(ft?ft.outerHTML:'');
+  mn.innerHTML='<section class="no-access" role="alert"><h1>You don’t have access to this page</h1><p class="muted">Your account doesn’t include permission for this area. An Admin can change this on the Team page.</p>'+(navOk.length?'<p><a class="btn navy" href="'+navOk[0][0]+'">Go to '+esc(navOk[0][1])+'</a></p>':'')+'</section>'+(ft?ft.outerHTML:'');
  }
 }
+paintClientChrome();
 try{if(sessionStorage.getItem('isc_login_evt')){sessionStorage.removeItem('isc_login_evt');S.log(data,'Login','Account',meName(),'Signed in');S.save(data);}}catch(e){}
 /* --- modal helpers: open/close, Escape, focus return, Tab trap-lite --- */
 var lastFocus=null,modalStack=[];/* stack: [{id,ret}] so a modal can open over another; Esc/close returns focus to its opener */
@@ -150,8 +157,23 @@ if(page==='tasks'){
 }
 if(page==='profile'){
  var c=clientById(S.CLIENT_ID); var f=$('profileForm');
+ var pend;/* undefined = unchanged, '' = remove, dataURL = new photo */
+ function curPhoto(){return pend===undefined?c.photo||'':pend;}
+ function paintPf(){var ph=curPhoto();$('pfAv').outerHTML=clientAv({first:f.elements.first.value||c.first,last:f.elements.last.value||c.last,photo:ph},'xl').replace('<span class="c-av','<span id="pfAv" class="c-av');
+  $('pfUpload').textContent=ph?'Replace photo':'Upload photo';$('pfRemove').hidden=!ph;
+  $('pfPhotoNote').textContent=pend!==undefined?(pend?'Preview. Save profile to keep this photo.':'Photo will be removed when you save.'):'JPG, PNG or WebP, up to 2 MB.';}
+ $('pfUpload').addEventListener('click',function(){$('pfFile').click();});
+ $('pfRemove').addEventListener('click',function(){pend='';$('pfErr').textContent='';paintPf();$('profileMsg').textContent='';});
+ $('pfFile').addEventListener('change',function(){var file=this.files&&this.files[0];this.value='';$('pfErr').textContent='';if(!file)return;
+  if(!/^image\/(jpeg|png|webp)$/.test(file.type)){$('pfErr').textContent='Choose a JPG, PNG or WebP image.';return;}
+  if(file.size>2*1048576){$('pfErr').textContent='That image is larger than 2 MB. Choose a smaller one.';return;}
+  var rd=new FileReader();rd.onload=function(){var im=new Image();im.onload=function(){var S2=256,cv=document.createElement('canvas');cv.width=cv.height=S2;var k=Math.min(im.width,im.height),sx=(im.width-k)/2,sy=(im.height-k)/2;var cx=cv.getContext('2d');cx.imageSmoothingQuality='high';cx.drawImage(im,sx,sy,k,k,0,0,S2,S2);
+    var u=cv.toDataURL('image/webp',0.85);if(u.indexOf('data:image/webp')!==0)u=cv.toDataURL('image/jpeg',0.85);pend=u;paintPf();$('profileMsg').textContent='';};
+   im.onerror=function(){$('pfErr').textContent='This image couldn’t be read. Try another file.';};im.src=rd.result;};rd.readAsDataURL(file);});
+ ['first','last'].forEach(function(k){f.elements[k].addEventListener('input',function(){if(!curPhoto())paintPf();});});
  ['first','last','phone','email','address','language','dob'].forEach(function(k){if(f.elements[k])f.elements[k].value=c[k]||'';});
- f.addEventListener('submit',function(e){e.preventDefault();['first','last','phone','email','address','language','dob'].forEach(function(k){c[k]=f.elements[k].value.trim();});c.updatedAt=S.today();S.save(data);$('profileMsg').textContent='Saved.';});
+ f.addEventListener('submit',function(e){e.preventDefault();['first','last','phone','email','address','language','dob'].forEach(function(k){c[k]=f.elements[k].value.trim();});var pc=pend;if(pc!==undefined){if(pc)c.photo=pc;else delete c.photo;S.log(data,pc?'Upload':'Delete','Profile',S.clientName(c),pc?'Profile photo updated':'Profile photo removed');pend=undefined;}c.updatedAt=S.today();if(!S.save(data)){$('profileMsg').textContent='Couldn’t save. Browser storage is full.';return;}paintPf();paintClientChrome();$('profileMsg').textContent='Saved.';});
+ paintPf();
  wireReset();
 }
 
@@ -227,7 +249,7 @@ var VIEW='';
 function viewIds(){if(!VIEW)return null;var id=VIEW.slice(2);return VIEW.charAt(0)==='m'?S.teamIds(data,id):[id];}
 function viewLabel(){if(!VIEW)return '';var a=S.adminById(data,VIEW.slice(2));return a?(VIEW.charAt(0)==='m'?S.adminName(a)+'’s team':S.adminName(a)):'';}
 function viewSetup(){var w=$('dashViewWrap'),sel=$('dashView');if(!w||!(SUPER||MGR))return;function o(v,t){return '<option value="'+esc(v)+'">'+esc(t)+'</option>';}
- var h;if(SUPER){var ms=S.managers(data),st=data.admins.filter(function(a){return a.role==='staff';});h=o('','Whole business')+(ms.length?'<optgroup label="Managers">'+ms.map(function(m){return o('m:'+m.id,S.adminName(m)+' (team)');}).join('')+'</optgroup>':'')+(st.length?'<optgroup label="Staff">'+st.map(function(s){return o('s:'+s.id,S.adminName(s));}).join('')+'</optgroup>':'');}
+ var h;if(SUPER){var ms=S.managers(data),st=S.staffList(data).filter(function(a){return !S.manages(data,a.role);});h=o('','Whole business')+(ms.length?'<optgroup label="Managers">'+ms.map(function(m){return o('m:'+m.id,S.adminName(m)+' (team)');}).join('')+'</optgroup>':'')+(st.length?'<optgroup label="Team members">'+st.map(function(s){return o('s:'+s.id,S.adminName(s));}).join('')+'</optgroup>':'');}
  else{h=o('','Whole team')+TEAM.filter(function(id){return id!==ME0;}).map(function(id){var a=S.adminById(data,id);return a?o('s:'+id,S.adminName(a)):'';}).join('');}
  sel.innerHTML=h;w.hidden=false;sel.addEventListener('change',function(){VIEW=sel.value;drawDash();});}
 function drawDash(){charts.forEach(function(c){c.destroy();});charts=[];SC=getScope();var VI=viewIds();
@@ -366,7 +388,7 @@ if(page==='clients'){
   return data.clients.filter(function(c){if(!inScope(c))return false;var apps=data.applications.filter(function(a){return a.clientId===c.id;});var name=S.clientName(c).toLowerCase();
    return (!q||name.indexOf(q)>-1||apps.some(function(a){return a.type.toLowerCase().indexOf(q)>-1;})) && (!st||apps.some(function(a){return a.status===st;})) && (!ty||apps.some(function(a){return a.type===ty;}));});}
  function render(){var list=filtered();var pages=Math.max(1,Math.ceil(list.length/per));if(cur>pages)cur=pages;var slice=list.slice((cur-1)*per,cur*per);
-  $('clientRows').innerHTML=slice.map(function(c){var apps=data.applications.filter(function(a){return a.clientId===c.id;});var act=apps.filter(isActiveApp);return '<tr><td><span class="cell-strong">'+esc(S.clientName(c))+'</span> <span class="muted cell-code">'+esc(S.clientCode(c))+'</span></td><td>'+esc(c.email)+'</td><td>'+esc(c.phone)+'</td><td><span class="assignee'+(c.assignedAdminId===ME?' is-me':'')+'">'+esc(adminLabel(c.assignedAdminId))+'</span></td><td>'+apps.length+(apps.length?'<span class="muted app-act-n">'+act.length+' active</span>':'')+'</td><td>'+(act.length?'<ul class="app-mini">'+act.map(function(x){return '<li>'+esc(S.visaCountry(S.visaFor(data,x)))+' - '+esc(x.type)+' · '+esc(x.status)+'</li>';}).join('')+'</ul>':'<span class="muted">None</span>')+'</td><td class="row-acts"><button type="button" class="icon-btn" data-edit-client="'+c.id+'" aria-label="Edit client '+esc(S.clientName(c))+'" title="Edit client">'+PENCIL+'</button>'+(can('clients','delete')?'<button type="button" class="icon-btn danger" data-del-client="'+c.id+'" aria-label="Delete client '+esc(S.clientName(c))+'" title="Delete client">'+TRASH+'</button>':'')+'<a class="btn sm msg-btn" href="messages.html?c='+encodeURIComponent(c.id)+'" aria-label="Message '+esc(S.clientName(c))+'">Message</a></td></tr>';}).join('');
+  $('clientRows').innerHTML=slice.map(function(c){var apps=data.applications.filter(function(a){return a.clientId===c.id;});var act=apps.filter(isActiveApp);return '<tr><td>'+clientAv(c,'sm')+'<span class="cell-strong">'+esc(S.clientName(c))+'</span> <span class="muted cell-code">'+esc(S.clientCode(c))+'</span></td><td>'+esc(c.email)+'</td><td>'+esc(c.phone)+'</td><td><span class="assignee'+(c.assignedAdminId===ME?' is-me':'')+'">'+esc(adminLabel(c.assignedAdminId))+'</span></td><td>'+apps.length+(apps.length?'<span class="muted app-act-n">'+act.length+' active</span>':'')+'</td><td>'+(act.length?'<ul class="app-mini">'+act.map(function(x){return '<li>'+esc(S.visaCountry(S.visaFor(data,x)))+' - '+esc(x.type)+' · '+esc(x.status)+'</li>';}).join('')+'</ul>':'<span class="muted">None</span>')+'</td><td class="row-acts"><button type="button" class="icon-btn" data-edit-client="'+c.id+'" aria-label="Edit client '+esc(S.clientName(c))+'" title="Edit client">'+PENCIL+'</button>'+(can('clients','delete')?'<button type="button" class="icon-btn danger" data-del-client="'+c.id+'" aria-label="Delete client '+esc(S.clientName(c))+'" title="Delete client">'+TRASH+'</button>':'')+'<a class="btn sm msg-btn" href="messages.html?c='+encodeURIComponent(c.id)+'" aria-label="Message '+esc(S.clientName(c))+'">Message</a></td></tr>';}).join('');
   $('pageInfo').textContent='Page '+cur+' of '+pages+' · '+list.length+' clients';
   $('prevPage').disabled=cur<=1; $('nextPage').disabled=cur>=pages;
   document.querySelectorAll('[data-edit-client]').forEach(function(b){b.addEventListener('click',function(){openEdit(b.getAttribute('data-edit-client'),b);});});
@@ -475,7 +497,7 @@ if(page==='visas'){
  $('moveRight').addEventListener('click',function(){move(true);}); $('moveLeft').addEventListener('click',function(){move(false);});
  function render(){/* Display-only sort: effective date DESC (newest first); missing/invalid dates last; stable via original index. Stored order in data.visas is NOT mutated, so dropdowns elsewhere keep their order. */
   var sorted=data.visas.map(function(v,i){return {v:v,i:i};}).sort(function(a,b){var ta=Date.parse(a.v.effective),tb=Date.parse(b.v.effective);var va=!isNaN(ta),vb=!isNaN(tb);if(va&&vb)return (tb-ta)||(a.i-b.i);if(va)return -1;if(vb)return 1;return a.i-b.i;}).map(function(x){return x.v;});
-  $('visaRows').innerHTML=sorted.map(function(v){return '<tr><td><strong>'+esc(v.name)+'</strong></td><td>'+esc(S.visaCountry(v))+'</td><td>'+esc(v.effective)+'</td><td>'+esc(v.notes)+'</td><td>'+v.docIds.length+'</td><td>'+esc(v.createdAt)+'</td><td>'+esc(v.updatedAt)+'</td><td class="row-acts">'+(can('casetypes','edit')?'<button type="button" class="icon-btn" data-edit-visa="'+v.id+'" aria-label="Edit case type '+esc(v.name)+'" title="Edit case type">'+PENCIL+'</button>':'')+(can('casetypes','delete')?'<button type="button" class="icon-btn danger" data-del-visa="'+v.id+'" aria-label="Delete case type '+esc(v.name)+'" title="Delete case type">'+TRASH+'</button>':'')+'</td></tr>';}).join('');
+  $('visaRows').innerHTML=sorted.map(function(v){return '<tr><td><strong>'+esc(v.name)+'</strong></td><td>'+esc(S.visaCountry(v))+'</td><td>'+esc(v.effective)+'</td><td>'+esc(v.notes)+'</td><td>'+v.docIds.length+'</td><td>'+esc(v.createdAt)+'</td><td>'+esc(v.updatedAt)+'</td><td class="row-acts">'+(can('casetypes','edit')?'<button type="button" class="icon-btn" data-edit-visa="'+v.id+'" aria-label="Edit case type '+esc(v.name)+'" title="Edit case type">'+PENCIL+'</button>':'')+(can('casetypes','delete')?'<button type="button" class="icon-btn danger" data-del-visa="'+v.id+'" aria-label="Delete case type '+esc(v.name)+'" title="Delete case type">'+TRASH+'</button>':'')+'</div></td></tr>';}).join('');
   document.querySelectorAll('[data-del-visa]').forEach(function(b){b.addEventListener('click',function(){var v=data.visas.find(function(x){return x.id===b.getAttribute('data-del-visa');});var used=data.applications.filter(function(a){return S.visaFor(data,a)===v;}).length;delVisa=used?null:v.id;$('delVisaMsg').textContent=used?'“'+v.name+'” is used by '+used+' application'+(used===1?'':'s')+', so it can’t be deleted. Move or remove those applications first.':'Delete “'+v.name+'” ('+S.visaCountry(v)+')? Its document checklist will be removed. This cannot be undone.';$('confirmDelVisa').hidden=!!used;openModal('delVisaModal',b);});});
   document.querySelectorAll('[data-edit-visa]').forEach(function(b){b.addEventListener('click',function(){editingVisa=b.getAttribute('data-edit-visa');var v=data.visas.find(function(x){return x.id===editingVisa;});$('visaName').value=v.name;$('visaCountry').value=S.visaCountry(v);$('visaDate').value=v.effective;$('visaNotes').value=v.notes;pickerChosen=v.docIds.slice();selAvail.clear();selReq.clear();renderPicker();openModal('visaModal');lastFocus=b;});});}
  var delVisa=null;
@@ -509,43 +531,133 @@ if(page==='logs'){
  $('logReset').addEventListener('click',function(){['logQ','logUser','logAction','logArea','logFrom','logTo'].forEach(function(id){$(id).value='';});lpg=1;lrender();});
  lrender();
 }
-if(page==='permissions'){
- var AR={};S.AREAS.forEach(function(a){AR[a.k]=a;});
- var editU=null;
- function summary(a){if(a.role==='super')return 'Full access';var p=data.perms[a.id]||{};return Object.keys(AR).filter(function(k){return p[k]&&p[k].view;}).map(function(k){return AR[k].label;}).join(', ')||'No access';}
- function teamCell(a){if(a.role==='super')return 'All teams';if(a.role==='manager'){var n=S.teamIds(data,a.id).length-1;return n+' staff';}var m=S.adminById(data,a.managerId);return m?'Reports to '+S.adminName(m):'No manager';}
- function mgrOpts(sel){return '<option value="">Select a manager…</option>'+S.managers(data).map(function(m){return '<option value="'+esc(m.id)+'"'+(m.id===sel?' selected':'')+'>'+esc(S.adminName(m))+'</option>';}).join('');}
- function mgrErr(on){$('pMgrErr').hidden=!on;$('pManager').classList.toggle('invalid',on);$('pManager').setAttribute('aria-invalid',on?'true':'false');}
- function syncMgr(){$('pMgrWrap').hidden=$('pRole').value!=='staff';mgrErr(false);}
- $('pManager').addEventListener('change',function(){if($('pManager').value)mgrErr(false);});
- function prender(){$('permRows').innerHTML=data.admins.map(function(a){return '<tr><td><span class="cell-strong">'+esc(S.adminName(a))+'</span>'+(a.id===ME0?' <span class="muted">(you)</span>':'')+'</td><td>'+esc(a.email||'')+'</td><td><span class="role-pill '+a.role+'">'+esc(S.ROLE_LABEL[a.role])+'</span></td><td class="muted">'+esc(teamCell(a))+'</td><td class="muted">'+esc(summary(a))+'</td><td>'+data.clients.filter(function(c){return c.assignedAdminId===a.id;}).length+'</td><td class="row-acts"><button type="button" class="icon-btn" data-pedit="'+a.id+'" aria-label="Edit permissions for '+esc(S.adminName(a))+'" title="Edit permissions">'+PENCIL+'</button></td></tr>';}).join('');
-  document.querySelectorAll('[data-pedit]').forEach(function(b){b.addEventListener('click',function(){openU(b.getAttribute('data-pedit'),b);});});}
- function matrix(role,p){var all=[];Object.keys(AR).forEach(function(k){AR[k].acts.forEach(function(x){if(all.indexOf(x)<0)all.push(x);});});
-  $('permHead').innerHTML='<tr><th>Area</th>'+all.map(function(x){return '<th class="num">'+esc(S.ACT_LABEL[x])+'</th>';}).join('')+'</tr>';
-  $('permMatrix').innerHTML=Object.keys(AR).map(function(k){var ar=AR[k];return '<tr><th scope="row">'+esc(ar.label)+'</th>'+all.map(function(x){if(ar.acts.indexOf(x)<0)return '<td class="num muted">—</td>';var on=role==='super'||(p[k]&&p[k][x]);return '<td class="num"><label class="tgl"><input type="checkbox" data-pa="'+k+'" data-px="'+x+'"'+(on?' checked':'')+(role==='super'?' disabled':'')+' aria-label="'+esc(ar.label+': '+S.ACT_LABEL[x])+'"><span aria-hidden="true"></span></label></td>';}).join('')+'</tr>';}).join('');
-  $('permNote').textContent=role==='super'?'Super Admins always have full access to every area.':'Changes apply the next time this user opens a page.';}
- function openU(id,opener){editU=id?S.adminById(data,id):null;$('permForm').reset();$('permMsg').textContent='';$('permTitle').textContent=editU?'Edit '+S.adminName(editU):'Add user';
-  $('pFirst').value=editU?editU.first:'';$('pLast').value=editU?editU.last:'';$('pEmail').value=editU?editU.email||'':'';$('pRole').value=editU?editU.role:'staff';$('pRole').disabled=!!(editU&&editU.id===ME0);$('pRoleNote').hidden=!(editU&&editU.id===ME0);
-  $('pManager').innerHTML=mgrOpts(editU?editU.managerId:'');syncMgr();matrix($('pRole').value,editU?data.perms[editU.id]||{}:S.roleDefaults('staff'));openModal('permModal',opener);}
- $('pRole').addEventListener('change',function(){syncMgr();matrix($('pRole').value,S.roleDefaults($('pRole').value));});
- document.querySelectorAll('[data-preset]').forEach(function(b){b.addEventListener('click',function(){if($('pRole').value==='super')return;matrix($('pRole').value,S.roleDefaults(b.getAttribute('data-preset')));$('permMsg').textContent=b.textContent+' preset applied. Save to keep it.';});});
- $('addUserBtn').addEventListener('click',function(){openU(null,$('addUserBtn'));});
- $('permForm').addEventListener('submit',function(e){e.preventDefault();if(!SUPER)return;var f=$('pFirst').value.trim(),l=$('pLast').value.trim(),em=$('pEmail').value.trim().toLowerCase(),role=$('pRole').value;
-  if(!f||!l||!em){$('permMsg').textContent='First name, last name and email are required.';return;}
-  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){$('permMsg').textContent='Enter a valid email address.';$('pEmail').focus();return;}
-  if(data.admins.some(function(a){return a!==editU&&String(a.email||'').toLowerCase()===em;})){$('permMsg').textContent='Another user already has this email.';return;}
-  if(editU&&editU.role==='manager'&&role!=='manager'&&S.teamIds(data,editU.id).length>1){$('permMsg').textContent='Move this manager’s staff to another manager before changing the role.';return;}
-  if(role==='staff'&&!$('pManager').value){mgrErr(true);$('permMsg').textContent='A manager is required for Staff members.';$('pManager').focus();return;}
-  var p={};Object.keys(AR).forEach(function(k){p[k]={};AR[k].acts.forEach(function(x){p[k][x]=false;});});
-  $('permMatrix').querySelectorAll('[data-pa]').forEach(function(c){p[c.getAttribute('data-pa')][c.getAttribute('data-px')]=c.checked;});
-  if(role==='super')p=S.roleDefaults('super');
-  if(role!=='super'&&editU&&editU.role==='super'&&data.admins.filter(function(a){return a.role==='super';}).length<2){$('permMsg').textContent='At least one Super Admin is required.';return;}
-  var isNew=!editU,u=editU||{id:'adm-'+Date.now()};var mg=role==='staff'?($('pManager').value||''):'';var before=editU?JSON.stringify({r:editU.role,m:editU.managerId||'',p:data.perms[editU.id]}):'';var wasMgr=editU&&editU.role==='manager';
-  u.first=f;u.last=l;u.email=em;u.role=role;if(role==='staff')u.managerId=mg;else delete u.managerId;if(wasMgr&&role!=='manager')data.admins.forEach(function(a){if(a.managerId===u.id)a.managerId='';});if(isNew)data.admins.push(u);data.perms[u.id]=p;
-  if(role==='super')data.clients.forEach(function(c){if(c.assignedAdminId===u.id){var sl=S.staffList(data);if(sl.length)c.assignedAdminId=sl[0].id;}});
-  var changed=!before||before!==JSON.stringify({r:u.role,m:u.managerId||'',p:p});var mm=S.adminById(data,u.managerId);
-  S.log(data,isNew?'Create':'Permission change','Permissions',S.adminName(u),isNew?'Added '+S.ROLE_LABEL[role]+' user':(changed?'Role: '+S.ROLE_LABEL[role]+(role==='staff'?'; manager: '+(mm?S.adminName(mm):'none'):'')+'; access: '+summary(u):'Updated details'));
-  S.save(data);closeModal('permModal');prender();$('permStatus').textContent=(isNew?'Added ':'Saved ')+S.adminName(u)+'.';});
- prender();
+if(page==='team'){
+ var LBL=new Proxy({},{get:function(_,k){return S.roleLabel(data,k);}}),PER=10,tpg=1,editU=null;
+ function pillCls(r){return r==='super'||r==='archive'?r:S.manages(data,r)?'manager':r==='staff'?'staff':'custom';}
+ function defLv(){return S.levelById(data,'staff')?'staff':(S.levels(data)[0]||{}).id||'super';}
+ function o(v,t){return '<option value="'+esc(v)+'">'+esc(t)+'</option>';}
+ function levelOpts(){$('mLevel').innerHTML=o('super','Admin')+S.levels(data).map(function(l){return o(l.id,l.name);}).join('')+o('archive','Archive');}
+ function filterOpts(){var v=$('tmLevel').value;$('tmLevel').innerHTML=o('','All active')+o('super','Admin')+S.levels(data).map(function(l){return o(l.id,l.name);}).join('')+o('archive','Archive');$('tmLevel').value=v;if($('tmLevel').value!==v)$('tmLevel').value='';}
+ filterOpts();
+ var CAN_ADD=can('team','add'),CAN_EDIT=can('team','edit'),CAN_ARCH=can('team','delete');
+ function initials(a){return ((a.first||'').charAt(0)+(a.last||'').charAt(0)).toUpperCase()||'?';}
+ function avatar(a){return a.photo?'<span class="mem-av"><img src="../assets/img/team/'+esc(a.photo)+'" alt="" width="36" height="36" loading="lazy"></span>':'<span class="mem-av ini" aria-hidden="true">'+esc(initials(a))+'</span>';}
+ function admins(){return data.admins.filter(function(a){return a.role==='super';});}
+ function mgrOpts(sel,ex){return '<option value="">Select a manager…</option>'+S.managers(data).filter(function(m){return m.id!==ex;}).map(function(m){return '<option value="'+esc(m.id)+'"'+(m.id===sel?' selected':'')+'>'+esc(S.adminName(m))+'</option>';}).join('');}
+ /* tabs */
+ function tab(which){var m=which!=='perms';$('tabMembers').setAttribute('aria-selected',m);$('tabPerms').setAttribute('aria-selected',!m);$('panelMembers').hidden=!m;$('panelPerms').hidden=m;if(history.replaceState)history.replaceState(null,'',m?location.pathname:'#permissions');}
+ $('tabMembers').addEventListener('click',function(){tab('members');});$('tabPerms').addEventListener('click',function(){tab('perms');});
+ /* members list */
+ function trender(){var q=$('tmQ').value.trim().toLowerCase(),lv=$('tmLevel').value,ORD=function(r){return r==='super'?0:r==='archive'?3:S.manages(data,r)?1:2;};
+  var list=data.admins.filter(function(a){if(lv?a.role!==lv:a.role==='archive')return false;if(!q)return true;return [S.adminName(a),a.email,a.phone].join(' ').toLowerCase().indexOf(q)>-1;}).slice().sort(function(a,b){return (ORD(a.role)-ORD(b.role))||(a.first||'').localeCompare(b.first||'');});
+  var pages=Math.max(1,Math.ceil(list.length/PER));if(tpg>pages)tpg=pages;var st=(tpg-1)*PER,rows=list.slice(st,st+PER);
+  $('tmRows').innerHTML=rows.length?rows.map(function(a){var arch=a.role==='archive';return '<tr'+(arch?' class="is-archived"':'')+'><td>'+avatar(a)+'</td><td><span class="cell-strong">'+esc(a.first||'')+'</span>'+(a.id===ME0?' <span class="muted">(you)</span>':'')+'</td><td>'+esc(a.last||'')+'</td><td>'+esc(a.phone||'—')+'</td><td>'+esc(a.email||'')+'</td><td><span class="role-pill '+pillCls(a.role)+'">'+esc(LBL[a.role]||a.role)+'</span>'+(S.reportsTo(data,a.role)&&S.adminById(data,a.managerId)?'<span class="muted small tm-rep">Reports to '+esc(S.adminName(S.adminById(data,a.managerId)))+'</span>':'')+'</td><td class="row-acts">'+(CAN_EDIT?'<button type="button" class="icon-btn" data-tedit="'+a.id+'" aria-label="Edit '+esc(S.adminName(a))+'" title="Edit member">'+PENCIL+'</button>':'')+'</td></tr>';}).join(''):'<tr><td colspan="7" class="muted">No team members match.</td></tr>';
+  $('tmInfo').textContent=list.length?'Showing '+(st+1)+'–'+Math.min(st+PER,list.length)+' of '+list.length+' member'+(list.length===1?'':'s'):'0 members';
+  $('tmPager').innerHTML=pages>1?'<button type="button" class="btn ghost sm" data-tp="prev" '+(tpg===1?'disabled':'')+'>‹ Previous</button><span class="pg-of">Page '+tpg+' of '+pages+'</span><button type="button" class="btn ghost sm" data-tp="next" '+(tpg===pages?'disabled':'')+'>Next ›</button>':'';
+  $('tmPager').querySelectorAll('[data-tp]').forEach(function(b){b.addEventListener('click',function(){tpg+=b.getAttribute('data-tp')==='next'?1:-1;trender();});});
+  document.querySelectorAll('[data-tedit]').forEach(function(b){b.addEventListener('click',function(){openM(b.getAttribute('data-tedit'),b);});});}
+ $('tmQ').addEventListener('input',function(){tpg=1;trender();});$('tmLevel').addEventListener('change',function(){tpg=1;trender();});
+ $('addMemberBtn').hidden=!CAN_ADD;
+ /* member form */
+ function archInfo(u){var cl=u?data.clients.filter(function(c){return c.assignedAdminId===u.id;}):[];var st=u&&S.manages(data,u.role)?data.admins.filter(function(a){return a.id!==u.id&&a.role!=='archive'&&a.managerId===u.id;}):[];return {cl:cl,st:st};}
+ function sync(){var lv=$('mLevel').value;$('mMgrWrap').hidden=!S.reportsTo(data,lv);$('mMgrErr').hidden=true;$('mManager').classList.remove('invalid');
+  var show=lv==='archive'&&editU&&editU.role!=='archive';$('mArch').hidden=!show;if(!show)return;var inf=archInfo(editU),nm=S.adminName(editU);
+  $('mArchText').textContent=nm+' will be signed out and can no longer sign in. They stay in the Team list and can be restored by changing their level.';
+  $('mArchCl').hidden=!inf.cl.length;$('mArchClLbl').textContent='Reassign '+inf.cl.length+' client'+(inf.cl.length===1?'':'s')+' to';
+  $('mArchClients').innerHTML='<option value="">Select a team member…</option>'+S.staffList(data).filter(function(a){return a.id!==editU.id;}).map(function(a){return '<option value="'+esc(a.id)+'">'+esc(S.adminName(a))+' ('+esc(LBL[a.role])+')</option>';}).join('');
+  $('mArchSt').hidden=!inf.st.length;$('mArchStLbl').textContent='New manager for '+inf.st.map(S.adminName).join(', ');$('mArchMgr').innerHTML=mgrOpts('',editU.id);}
+ function openM(id,opener){editU=id?S.adminById(data,id):null;$('memForm').reset();$('memMsg').textContent='';$('memTitle').textContent=editU?'Edit '+S.adminName(editU):'Add member';
+  $('mFirst').value=editU?editU.first||'':'';$('mLast').value=editU?editU.last||'':'';$('mPhone').value=editU?editU.phone||'':'';$('mEmail').value=editU?editU.email||'':'';
+  var self=!!(editU&&editU.id===ME0);levelOpts();$('mLevel').value=editU?editU.role:defLv();$('mLevel').disabled=self;$('mLevelNote').hidden=!self;
+  $('mLevel').querySelector('[value="archive"]').disabled=!CAN_ARCH||!editU;
+  $('mManager').innerHTML=mgrOpts(editU?editU.managerId:'',editU&&editU.id);sync();openModal('memModal',opener);}
+ $('mLevel').addEventListener('change',sync);
+ ['mManager','mArchClients','mArchMgr'].forEach(function(i){$(i).addEventListener('change',function(){$('memMsg').textContent='';$('mMgrErr').hidden=true;$('mManager').classList.remove('invalid');});});
+ $('addMemberBtn').addEventListener('click',function(){openM(null,$('addMemberBtn'));});
+ function err(t,f){$('memMsg').textContent=t;if(f)$(f).focus();}
+ $('memForm').addEventListener('submit',function(e){e.preventDefault();if(editU?!CAN_EDIT:!CAN_ADD)return;
+  var f=$('mFirst').value.trim(),l=$('mLast').value.trim(),ph=$('mPhone').value.trim(),em=$('mEmail').value.trim().toLowerCase(),lv=editU&&editU.id===ME0?editU.role:$('mLevel').value;
+  if(!f||!l||!em)return err('First name, last name and email are required.',!f?'mFirst':!l?'mLast':'mEmail');
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em))return err('Enter a valid email address.','mEmail');
+  if(ph&&!/^[\d\s()+.-]{7,}$/.test(ph))return err('Enter a valid contact number.','mPhone');
+  if(data.admins.some(function(a){return a!==editU&&String(a.email||'').toLowerCase()===em;}))return err('Another member already has this email.','mEmail');
+  if(S.reportsTo(data,lv)&&!$('mManager').value){$('mMgrErr').hidden=false;$('mManager').classList.add('invalid');return err('A manager is required for '+LBL[lv]+' members.','mManager');}
+  var was=editU?editU.role:'';
+  if(editU&&was==='super'&&lv!=='super'&&admins().length<2)return err('At least one Admin is required.');
+  if(editU&&editU.id===ME0&&lv!==was)return err('You can’t change your own level.');
+  var inf=archInfo(editU),toArch=lv==='archive'&&was!=='archive',reCl='',reMg='';
+  if(toArch){if(!CAN_ARCH)return err('You don’t have permission to archive members.');
+   reCl=$('mArchClients').value;reMg=$('mArchMgr').value;
+   if(inf.cl.length&&!reCl)return err('Choose who should take over this member’s clients.','mArchClients');
+   if(inf.st.length&&!reMg)return err('Choose a new manager for this member’s staff.','mArchMgr');}
+  else if(editU&&S.manages(data,was)&&!S.manages(data,lv)&&inf.st.length)return err('Move this manager’s staff to another manager before changing the level.');
+  else if(editU&&was!=='super'&&was!=='archive'&&(lv==='super')&&inf.cl.length)return err('Reassign this member’s clients before making them an Admin.');
+  var isNew=!editU,u=editU||{id:'adm-'+Date.now()};var before=editU?JSON.stringify([u.first,u.last,u.phone||'',u.email,u.role,u.managerId||'']):'';
+  u.first=f;u.last=l;u.phone=ph;u.email=em;u.role=lv;if(S.reportsTo(data,lv))u.managerId=$('mManager').value;else delete u.managerId;if(isNew)data.admins.push(u);
+  if(toArch){inf.cl.forEach(function(c){c.assignedAdminId=reCl;});inf.st.forEach(function(a){a.managerId=reMg;});
+   var det='Archived (was '+LBL[was]+')';if(inf.cl.length)det+='; '+inf.cl.length+' client'+(inf.cl.length===1?'':'s')+' reassigned to '+S.adminName(S.adminById(data,reCl));if(inf.st.length)det+='; '+inf.st.length+' staff moved to '+S.adminName(S.adminById(data,reMg));
+   S.log(data,'Status change','Team',S.adminName(u),det);}
+  else if(isNew)S.log(data,'Create','Team',S.adminName(u),'Added '+LBL[lv]+' member');
+  else if(was==='archive'&&lv!=='archive')S.log(data,'Status change','Team',S.adminName(u),'Restored as '+LBL[lv]);
+  else if(before!==JSON.stringify([u.first,u.last,u.phone||'',u.email,u.role,u.managerId||'']))S.log(data,was!==lv?'Permission change':'Edit','Team',S.adminName(u),was!==lv?'Level: '+LBL[was]+' → '+LBL[lv]:'Updated details');
+  S.save(data);closeModal('memModal');trender();$('tmStatus').textContent=(isNew?'Added ':toArch?'Archived ':'Saved ')+S.adminName(u)+'.';});
+ /* permission levels */
+ var ROWS=[['Dashboard','dashboard',{view:'view'}],['Clients','clients',{view:'view',add:'add',edit:'edit',delete:'delete'}],['All clients','clients',{view:'all'}],['Documents','documents',{view:'view',add:'add',edit:'edit',delete:'delete'}],['Case types','casetypes',{view:'view',add:'add',edit:'edit',delete:'delete'}],['Messages','messages',{view:'view'}],['Activity logs','logs',{view:'view'}],['Team','team',{view:'view',add:'add',edit:'edit',delete:'delete'}]];
+ var COLS=['view','add','edit','delete'],CAN_LVL=SUPER,editL=null,delL=null;
+ var LOCK='<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+ var TRASH='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>';
+ function members(id){return data.admins.filter(function(a){return a.role===id;});}
+ function validMgr(a,exLv){return S.managers(data).some(function(m){return m.id===a.managerId&&m.id!==a.id&&m.role!==exLv;});}
+ function summary(perms){var out=[];ROWS.forEach(function(r){var p=perms[r[1]]||{},cs=COLS.filter(function(c){return r[2][c];}),on=cs.filter(function(c){return p[r[2][c]];});if(!on.length)return;out.push(r[0]+(cs.length>1?(on.length===cs.length?' (full)':' ('+on.map(function(c){return S.ACT_LABEL[c].toLowerCase();}).join(', ')+')'):''));});return out.length?out.join(' · '):'No access';}
+ function lrow(id,name,desc,acc,sys,extra){var n=members(id).length;return '<tr'+(sys?' class="sys"':'')+'><td><span class="role-pill '+pillCls(id)+'">'+esc(name)+'</span>'+(sys?' <span class="sys-tag" title="Built-in system level">'+LOCK+' System</span>':'')+(extra?'<span class="muted small tm-rep">'+esc(extra)+'</span>':'')+'</td><td class="muted">'+esc(desc||'—')+'</td><td class="num">'+n+'</td><td class="small lvl-sum">'+esc(acc)+'</td><td><div class="row-acts">'+(sys?'<span class="muted small">Locked</span>':CAN_LVL?'<button type="button" class="icon-btn" data-ledit="'+esc(id)+'" aria-label="Edit '+esc(name)+' level" title="Edit level">'+PENCIL+'</button><button type="button" class="icon-btn danger" data-ldel="'+esc(id)+'" aria-label="Delete '+esc(name)+' level" title="Delete level">'+TRASH+'</button>':'')+'</td></tr>';}
+ function grender(){$('addLevelBtn').hidden=!CAN_LVL;
+  $('lvlRows').innerHTML=lrow('super','Admin','Owns the business account. Full access to everything.','Full access',true)+S.levels(data).map(function(l){var ex=[l.reports?'Reports to a manager':'',l.manages?'Can manage a team':''].filter(Boolean).join(' · ');return lrow(l.id,l.name,l.desc,summary(l.perms),false,ex);}).join('')+lrow('archive','Archive','Former members. They can’t sign in and are hidden from assignment.','No access',true);
+  document.querySelectorAll('[data-ledit]').forEach(function(b){b.addEventListener('click',function(){openL(b.getAttribute('data-ledit'),b);});});
+  document.querySelectorAll('[data-ldel]').forEach(function(b){b.addEventListener('click',function(){openDel(b.getAttribute('data-ldel'),b);});});}
+ function lgrid(perms){$('lGrid').innerHTML='<thead><tr><th>Area</th>'+COLS.map(function(c){return '<th class="num">'+esc(S.ACT_LABEL[c])+'</th>';}).join('')+'</tr></thead><tbody>'+ROWS.map(function(r){return '<tr><th scope="row">'+esc(r[0])+'</th>'+COLS.map(function(c){var k=r[2][c];if(!k)return '<td class="num muted">—</td>';var on=!!(perms[r[1]]&&perms[r[1]][k]);return '<td class="num"><label class="tgl"><input type="checkbox" data-la="'+r[1]+'" data-lk="'+k+'"'+(on?' checked':'')+' aria-label="'+esc(r[0]+': '+S.ACT_LABEL[c])+'"><span aria-hidden="true"></span></label></td>';}).join('')+'</tr>';}).join('')+'</tbody>';}
+ function blank(){var p={};S.AREAS.forEach(function(a){p[a.k]={};a.acts.forEach(function(x){p[a.k][x]=false;});});return p;}
+ function openL(id,opener){if(!CAN_LVL)return;editL=id?S.levelById(data,id):null;$('lvlMsg').textContent='';$('lvlTitle').textContent=editL?'Edit '+editL.name+' level':'Add level';
+  $('lName').value=editL?editL.name:'';$('lDesc').value=editL?editL.desc||'':'';$('lReports').checked=!!(editL&&editL.reports);$('lManages').checked=!!(editL&&editL.manages);
+  lgrid(editL?editL.perms:blank());openModal('lvlModal',opener);}
+ $('lGrid').addEventListener('change',function(e){var c=e.target;if(!c.matches||!c.matches('input[data-la]'))return;var a=c.getAttribute('data-la'),k=c.getAttribute('data-lk');
+  $('lGrid').querySelectorAll('input[data-la="'+a+'"]').forEach(function(x){var xk=x.getAttribute('data-lk');if(k==='view'&&!c.checked&&xk!=='view')x.checked=false;if(k!=='view'&&c.checked&&xk==='view')x.checked=true;});});
+ $('addLevelBtn').addEventListener('click',function(){openL(null,$('addLevelBtn'));});
+ ['lName','lReports','lManages'].forEach(function(i){$(i).addEventListener('input',function(){$('lvlMsg').textContent='';});});
+ $('lvlForm').addEventListener('submit',function(e){e.preventDefault();if(!CAN_LVL)return;var nm=$('lName').value.trim().replace(/\s+/g,' '),ds=$('lDesc').value.trim(),rp=$('lReports').checked,mg=$('lManages').checked;
+  function lerr(t,f){$('lvlMsg').textContent=t;if(f)$(f).focus();}
+  if(!nm)return lerr('Level name is required.','lName');
+  if(/^(admin|archive|super admin)$/i.test(nm)||S.levels(data).some(function(l){return l!==editL&&l.name.toLowerCase()===nm.toLowerCase();}))return lerr('Another level already has this name.','lName');
+  if(rp&&mg)return lerr('Choose either “Reports to a manager” or “Can manage a team”, not both.');
+  var perms=blank();$('lGrid').querySelectorAll('input[data-la]').forEach(function(c){perms[c.getAttribute('data-la')][c.getAttribute('data-lk')]=c.checked;});
+  var lid=editL?editL.id:null,ms=lid?members(lid):[];
+  if(editL&&editL.manages&&!mg&&data.admins.some(function(a){return a.role!=='archive'&&ms.some(function(m){return m.id===a.managerId&&a.id!==m.id;});}))return lerr('Members on this level manage a team. Move their team to another manager before turning off “Can manage a team”.');
+  var avail=S.managers(data).filter(function(m){return m.role!==lid;});
+  if(rp&&ms.length&&!avail.length)return lerr('There’s no manager to assign this level’s members to. Turn on “Can manage a team” for another level first.');
+  var ch=[];if(editL){if(editL.name!==nm)ch.push('renamed from '+editL.name);if((editL.desc||'')!==ds)ch.push('description updated');if(!!editL.reports!==rp)ch.push('Reports to a manager '+(rp?'on':'off'));if(!!editL.manages!==mg)ch.push('Can manage a team '+(mg?'on':'off'));
+   ROWS.forEach(function(r){COLS.forEach(function(c){var k=r[2][c];if(!k)return;var a=!!(editL.perms[r[1]]&&editL.perms[r[1]][k]),b=perms[r[1]][k];if(a!==b)ch.push(r[0]+': '+S.ACT_LABEL[c]+' '+(b?'on':'off'));});});}
+  var L=editL||{id:'lvl-'+Date.now().toString(36)};L.name=nm;L.desc=ds;L.reports=rp;L.manages=mg;L.perms=perms;
+  if(!editL)data.levels.push(L);
+  ms.forEach(function(a){if(rp){if(!validMgr(a,L.id))a.managerId=avail[0].id;}else delete a.managerId;});
+  if(!editL)S.log(data,'Create','Team',nm+' level','Added level: '+summary(perms));else if(ch.length)S.log(data,'Permission change','Team',nm+' level',ch.join('; '));
+  S.save(data);closeModal('lvlModal');grender();filterOpts();trender();$('lvStatus').textContent=(editL?'Saved ':'Added ')+nm+' level.';});
+ function openDel(id,opener){if(!CAN_LVL)return;delL=S.levelById(data,id);if(!delL)return;var ms=members(id);$('lvlDelMsg').textContent='';
+  $('lvlDelTitle').textContent='Delete '+delL.name+' level?';
+  $('lvlDelText').textContent=ms.length?ms.length+' member'+(ms.length===1?' is':'s are')+' on this level ('+ms.map(S.adminName).join(', ')+'). Choose a level to move them to. This can’t be undone.':'No one is on this level. This can’t be undone.';
+  $('lvlDelMove').hidden=!ms.length;$('lvlDelTo').innerHTML='<option value="">Select a level…</option>'+S.levels(data).filter(function(l){return l.id!==id;}).map(function(l){return o(l.id,l.name);}).join('')+o('archive','Archive');
+  $('lvlDelMgrWrap').hidden=true;openModal('lvlDelModal',opener);}
+ function delSync(){var to=$('lvlDelTo').value,ms=members(delL.id);$('lvlDelMsg').textContent='';var need=S.reportsTo(data,to)&&ms.some(function(a){return !validMgr(a,delL.id);});$('lvlDelMgrWrap').hidden=!need;
+  if(need)$('lvlDelMgr').innerHTML='<option value="">Select a manager…</option>'+S.managers(data).filter(function(m){return m.role!==delL.id;}).map(function(m){return o(m.id,S.adminName(m));}).join('');}
+ $('lvlDelTo').addEventListener('change',delSync);$('lvlDelMgr').addEventListener('change',function(){$('lvlDelMsg').textContent='';});
+ $('lvlDelGo').addEventListener('click',function(){if(!CAN_LVL||!delL)return;var ms=members(delL.id),to=$('lvlDelTo').value;function derr(t,f){$('lvlDelMsg').textContent=t;if(f)$(f).focus();}
+  if(ms.length&&!to)return derr('Choose a level to move this level’s members to.','lvlDelTo');
+  var team=delL.manages?data.admins.filter(function(a){return a.role!=='archive'&&a.role!==delL.id&&ms.some(function(m){return m.id===a.managerId;});}):[];
+  if(team.length&&!S.manages(data,to))return derr('Members on this level manage '+team.map(S.adminName).join(', ')+'. Move them to a level that can manage a team, or move their team to another manager first.','lvlDelTo');
+  if(to==='archive'&&ms.some(function(a){return data.clients.some(function(c){return c.assignedAdminId===a.id;});}))return derr('Some of these members still have clients. Reassign their clients on the Members tab before archiving them.','lvlDelTo');
+  var mgr='';if(!$('lvlDelMgrWrap').hidden){mgr=$('lvlDelMgr').value;if(!mgr)return derr('Choose a manager for the moved members.','lvlDelMgr');}
+  var nm=delL.name,did=delL.id;ms.forEach(function(a){if(S.reportsTo(data,to)){if(!validMgr(a,did))a.managerId=mgr;}else if(to!=='archive')delete a.managerId;a.role=to;});
+  data.levels=data.levels.filter(function(l){return l.id!==did;});
+  S.log(data,'Delete','Team',nm+' level',ms.length?'Deleted level; '+ms.length+' member'+(ms.length===1?'':'s')+' moved to '+S.roleLabel(data,to):'Deleted level');
+  S.save(data);closeModal('lvlDelModal');delL=null;grender();filterOpts();trender();$('lvStatus').textContent='Deleted '+nm+' level.';});
+ trender();grender();if(location.hash==='#permissions')tab('perms');
 }
 })();

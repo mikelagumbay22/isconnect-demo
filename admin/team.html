@@ -1,0 +1,44 @@
+<!doctype html><html lang="en-CA"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Team | ISConnect portal</title>
+<link rel="icon" href="../favicon.ico"><link rel="apple-touch-icon" href="../assets/brand/apple-touch-icon.png"><meta name="theme-color" content="#0b1626"><link rel="stylesheet" href="../assets/portal/dashboard.css?v=20261022i">
+<script>(function(){var r=sessionStorage.getItem('isc_demo_role');if(r!=='owner'||!sessionStorage.getItem('isc_demo_admin')){location.replace('../login.html');}})();</script>
+</head><body data-page="team" data-role="owner">
+<div class="topbar"><img src="../assets/brand/logo-white-220.webp?v=20261022i" srcset="../assets/brand/logo-white-220.webp?v=20261022i 1x, ../assets/brand/logo-white-440.webp?v=20261022i 2x" alt="International Students Connect" width="150" height="45"><button class="btn" type="button" data-menu aria-expanded="false" aria-controls="sideNav">☰ Menu</button></div>
+<div class="dash"><aside class="side" id="sideNav"><img src="../assets/brand/logo-white-440.webp?v=20261022i" alt="International Students Connect" width="200" height="60"><p>Signed in as<br><strong data-admin-name>Admin</strong></p><nav aria-label="Dashboard"><a href="dashboard.html">Dashboard</a><a href="clients.html">Clients</a><a href="documents.html">Documents</a><a href="visas.html">Case types</a><a href="messages.html" class="nav-msg">Messages <span class="nav-badge" id="navMsgBadge" hidden></span></a><a href="../index.html">View public site</a><a href="#" data-signout>Sign out</a></nav></aside>
+<main class="main" id="main"><h1>Team</h1>
+<p class="muted">Everyone who can sign in to the portal, and what each permission level can do.</p>
+<div class="tabs" role="tablist" aria-label="Team sections"><button type="button" role="tab" id="tabMembers" aria-controls="panelMembers" aria-selected="true">Members</button><button type="button" role="tab" id="tabPerms" aria-controls="panelPerms" aria-selected="false">Permissions</button></div>
+<section id="panelMembers" role="tabpanel" aria-labelledby="tabMembers">
+<div class="team-bar"><div class="team-filters"><div><label for="tmQ">Search</label><input id="tmQ" type="search" placeholder="Name, email or phone"></div><div><label for="tmLevel">Permission level</label><select id="tmLevel"></select></div></div><button class="btn navy" id="addMemberBtn" type="button">＋ Add member</button></div>
+<p id="tmStatus" class="sample-status" role="status" aria-live="polite"></p>
+<div class="tablewrap" style="margin-top:12px"><table class="team-table"><thead><tr><th><span class="sr-only">Avatar</span></th><th>First name</th><th>Last name</th><th>Contact number</th><th>Email</th><th>Permission level</th><th>Actions</th></tr></thead><tbody id="tmRows"></tbody></table></div>
+<div class="log-foot"><p class="muted" id="tmInfo" role="status" aria-live="polite"></p><div class="log-pager" id="tmPager"></div></div>
+</section>
+<section id="panelPerms" role="tabpanel" aria-labelledby="tabPerms" hidden>
+<div class="team-bar"><p class="muted">Each member has one permission level. Changes to a level apply right away to everyone on it.</p><button class="btn navy" id="addLevelBtn" type="button">＋ Add level</button></div><p id="lvStatus" class="muted small" role="status" aria-live="polite"></p>
+<div class="s-card"><div class="tablewrap"><table class="data-table lvl-table"><thead><tr><th>Level</th><th>Description</th><th class="num">Members</th><th>Access</th><th>Actions</th></tr></thead><tbody id="lvlRows"></tbody></table></div></div>
+</section>
+<div class="modal-back" id="memModal" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="memTitle">
+<h2 id="memTitle">Edit member</h2><form id="memForm" novalidate><div class="perm-grid">
+<div><label for="mFirst">First name</label><input id="mFirst" required autocomplete="off"></div><div><label for="mLast">Last name</label><input id="mLast" required autocomplete="off"></div>
+<div><label for="mPhone">Contact number</label><input id="mPhone" type="tel" placeholder="(403) 555-0100" autocomplete="off"></div><div><label for="mEmail">Email</label><input id="mEmail" type="email" required autocomplete="off"></div>
+<div><label for="mLevel">Permission level</label><select id="mLevel"></select><p class="muted small" id="mLevelNote" hidden>You can’t change your own level.</p></div>
+<div id="mMgrWrap"><label for="mManager">Reports to</label><select id="mManager"></select><p class="field-err" id="mMgrErr" hidden>A manager is required for this level.</p></div>
+</div>
+<div id="mArch" class="arch-box" hidden><p id="mArchText"></p><div id="mArchCl" hidden><label for="mArchClients" id="mArchClLbl">Reassign clients to</label><select id="mArchClients"></select></div><div id="mArchSt" hidden><label for="mArchMgr" id="mArchStLbl">New manager for their staff</label><select id="mArchMgr"></select></div></div>
+<p id="memMsg" class="field-err" role="alert"></p>
+<div class="actions"><button class="btn navy" type="submit" id="memSave">Save</button><button class="btn ghost" type="button" data-close="memModal">Cancel</button></div></form></div></div>
+<div class="modal-back" id="lvlModal" hidden><div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="lvlTitle">
+<h2 id="lvlTitle">Add level</h2><form id="lvlForm" novalidate><div class="perm-grid">
+<div><label for="lName">Level name</label><input id="lName" required maxlength="40" autocomplete="off"></div><div><label for="lDesc">Description <span class="muted small">(optional)</span></label><input id="lDesc" maxlength="140" autocomplete="off"></div></div>
+<div class="lvl-behav"><label class="sw-row"><span class="tgl"><input type="checkbox" id="lReports"><span aria-hidden="true"></span></span><span><strong>Reports to a manager</strong><span class="muted small">Members on this level must choose a manager.</span></span></label>
+<label class="sw-row"><span class="tgl"><input type="checkbox" id="lManages"><span aria-hidden="true"></span></span><span><strong>Can manage a team</strong><span class="muted small">Members can be chosen as a manager and see their team’s clients, figures and activity.</span></span></label></div>
+<h3 class="lvl-h3">Access</h3><div class="tablewrap"><table class="perm-table" id="lGrid"></table></div>
+<p id="lvlMsg" class="field-err" role="alert"></p>
+<div class="actions"><button class="btn navy" type="submit" id="lvlSave">Save level</button><button class="btn ghost" type="button" data-close="lvlModal">Cancel</button></div></form></div></div>
+<div class="modal-back" id="lvlDelModal" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="lvlDelTitle">
+<h2 id="lvlDelTitle">Delete level</h2><p id="lvlDelText"></p><div id="lvlDelMove" hidden><label for="lvlDelTo" id="lvlDelToLbl">Move members to</label><select id="lvlDelTo"></select><div id="lvlDelMgrWrap" hidden><label for="lvlDelMgr">Manager for moved members</label><select id="lvlDelMgr"></select></div></div>
+<p id="lvlDelMsg" class="field-err" role="alert"></p>
+<div class="actions"><button class="btn danger" type="button" id="lvlDelGo">Delete level</button><button class="btn ghost" type="button" data-close="lvlDelModal">Cancel</button></div></div></div>
+<footer class="mini-footer"><p class="policy-links"><a href="../privacy.html">Privacy Policy</a><span class="sep" aria-hidden="true">|</span><a href="../cookies.html">Cookies Policy</a></p><p class="mini-disc">Concept site, not affiliated with or approved by International Students Connect.</p></footer></main></div>
+<script src="../assets/portal/sample-seeds.js?v=20261022i"></script><script src="../assets/portal/portal-data.js?v=20261022i"></script><script src="../assets/portal/portal.js?v=20261022i"></script><script src="../assets/portal/messages.js?v=20261022i"></script></body></html>
