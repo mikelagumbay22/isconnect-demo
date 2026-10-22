@@ -67,8 +67,8 @@ function seed(){
   apps.push({id:'a-s'+j,clientId:'c'+j,type:vname(vid),visaId:vid,effectiveDate:'2026-01-01',status:stats[j%stats.length],date:dt,due:(j%4===0?'2026-09-':'2026-12-')+String((j%27)+1).padStart(2,'0'),createdAt:dt,updatedAt:dt,progress:[20,45,60,80,35,90,100,55][j%8]});}
  return {version:1,admins:ADMINS.slice(),clients:clients,applications:apps,checklists:{},
   tasks:tasksSeed(),announcements:announcementsSeed(),documents:docsSeed(),visas:vs,copyV:1,emailsV:1};}
-function load(){try{var raw=localStorage.getItem(KEY);if(raw){var d=JSON.parse(raw);if(d&&d.version===1){var ch=false;if(migrateDocs(d))ch=true;if(migrateMetrics(d))ch=true;if(migrateSamples(d))ch=true;if(migrateNames(d))ch=true;if(migrateAll(d))ch=true;if(migrateAdmins(d))ch=true;if(migrateRoles(d))ch=true;if(ensureAssignments(d))ch=true;if(ch)save(d);return d;}}}catch(e){}
- var s=seed();migrateDocs(s);migrateMetrics(s);migrateSamples(s);migrateNames(s);migrateAll(s);migrateAdmins(s);migrateRoles(s);save(s);return s;}
+function load(){try{var raw=localStorage.getItem(KEY);if(raw){var d=JSON.parse(raw);if(d&&d.version===1){var ch=false;if(migrateDocs(d))ch=true;if(migrateMetrics(d))ch=true;if(migrateSamples(d))ch=true;if(migrateNames(d))ch=true;if(migrateAll(d))ch=true;if(migrateAdmins(d))ch=true;if(migrateRoles(d))ch=true;if(migrateTeam2Apps(d)){migrateRoles(d);ch=true;}if(ensureAssignments(d))ch=true;if(ch)save(d);return d;}}}catch(e){}
+ var s=seed();migrateDocs(s);migrateMetrics(s);migrateSamples(s);migrateNames(s);migrateAll(s);migrateAdmins(s);migrateRoles(s);migrateTeam2Apps(s);save(s);return s;}
 function save(d){try{ensureAssignments(d);mergeThreads(d);localStorage.setItem(KEY,JSON.stringify(d));return true;}catch(e){if(window.console)console.warn('ISConnect: could not save (storage full?)');return false;}}
 function reset(){localStorage.removeItem(KEY);return load();}
 /* adminsV:1 — guarantees data.admins and a valid assignedAdminId on every client (new clients default to the admin who adds them). */
@@ -79,19 +79,36 @@ function migrateAdmins(d){var ch=false;if(!Array.isArray(d.admins)||!d.admins.le
 var SUPER_ADMIN={id:'adm-0',first:'Emmanuel',last:'Garcia',email:'superadmin@isconnect.ca',role:'super'};
 var AREAS=[{k:'dashboard',label:'Dashboard',acts:['view']},{k:'clients',label:'Clients',acts:['view','all','add','edit','delete']},{k:'documents',label:'Documents',acts:['view','add','edit','delete']},{k:'casetypes',label:'Case types',acts:['view','add','edit','delete']},{k:'messages',label:'Messages',acts:['view']},{k:'logs',label:'Activity logs',acts:['view']}];
 var ACT_LABEL={view:'View',all:'All clients',add:'Add',edit:'Edit',delete:'Delete'};
-var ROLE_LABEL={super:'Super Admin',staff:'Staff'};
+var ROLE_LABEL={super:'Super Admin',manager:'Manager',staff:'Staff'};
+var MANAGER={id:'adm-4',first:'Mary Grace',last:'Ariola',email:'manager@isconnect.ca',role:'manager'};
+var MANAGER2={id:'adm-5',first:'Alma',last:'Armada',email:'manager2@isconnect.ca',role:'manager'};
+/* Second team: staff reporting to Alma Armada. */
+var TEAM2=[{id:'adm-6',first:'Joshua',last:'Santos',email:'joshua.santos@example.com',role:'staff',managerId:'adm-5'},{id:'adm-7',first:'Bea',last:'Navarro',email:'bea.navarro@example.com',role:'staff',managerId:'adm-5'}];
 function roleDefaults(role){var p={};AREAS.forEach(function(a){p[a.k]={};a.acts.forEach(function(x){p[a.k][x]=role==='super';});});
  if(role!=='super'){p.dashboard.view=true;p.clients.view=p.clients.add=p.clients.edit=true;p.documents.view=p.documents.add=p.documents.edit=p.documents.delete=true;p.casetypes.view=p.casetypes.add=p.casetypes.edit=true;p.messages.view=true;}
+ if(role==='manager'){p.clients.delete=true;p.casetypes.delete=true;p.logs.view=true;}
  return p;}
+/* Assignable users: Managers and Staff (never Super Admins). */
 function staffList(d){return (d.admins||[]).filter(function(a){return a.role!=='super';});}
+function managers(d){return (d.admins||[]).filter(function(a){return a.role==='manager';});}
+/* teamIds: a Manager's own id plus every Staff member whose managerId is that Manager. */
+function teamIds(d,id){var a=adminById(d,id);if(!a)return [];if(a.role!=='manager')return [a.id];return [a.id].concat((d.admins||[]).filter(function(x){return x.managerId===a.id&&x.role==='staff';}).map(function(x){return x.id;}));}
 function migrateRoles(d){var ch=false;if(!Array.isArray(d.admins))d.admins=[];d.admins.forEach(function(x){if(x.id==='adm-0'&&x.first==='Isabel'&&x.last==='Ramirez'){x.first=SUPER_ADMIN.first;x.last=SUPER_ADMIN.last;ch=true;}});(d.logs||[]).forEach(function(l){if(l.actor==='Isabel Ramirez'){l.actor='Emmanuel Garcia';ch=true;}if(l.target==='Isabel Ramirez'){l.target='Emmanuel Garcia';ch=true;}});
  if(!d.admins.some(function(a){return a.id===SUPER_ADMIN.id;})){d.admins.unshift(JSON.parse(JSON.stringify(SUPER_ADMIN)));ch=true;}
+ if(!d.admins.some(function(a){return a.id===MANAGER.id;})){var mi=d.admins.findIndex(function(a){return a.role!=='super';});d.admins.splice(mi<0?d.admins.length:mi,0,JSON.parse(JSON.stringify(MANAGER)));ch=true;}
+ var added2=[];if(!d.admins.some(function(a){return a.id===MANAGER2.id;})){var mj=d.admins.findIndex(function(a){return a.role==='staff';});d.admins.splice(mj<0?d.admins.length:mj,0,JSON.parse(JSON.stringify(MANAGER2)));added2.push(MANAGER2.id);ch=true;}
+ TEAM2.forEach(function(t){if(!d.admins.some(function(a){return a.id===t.id;})){d.admins.push(JSON.parse(JSON.stringify(t)));added2.push(t.id);ch=true;}});
+ /* One-time: hand every 5th and 6th-of-every-7 client to the new staff so their team has a caseload. */
+ var newSt=TEAM2.filter(function(t){return added2.indexOf(t.id)>-1;});if(newSt.length)(d.clients||[]).forEach(function(c,i){var k=i%7;if(k>=5&&newSt[k-5])c.assignedAdminId=newSt[k-5].id;});
  d.admins.forEach(function(a){if(!a.role){a.role=a.id===SUPER_ADMIN.id?'super':'staff';ch=true;}});
  if(!d.perms||typeof d.perms!=='object'){d.perms={};ch=true;}
  d.admins.forEach(function(a){var def=roleDefaults(a.role);if(!d.perms[a.id]){d.perms[a.id]=def;ch=true;return;}
   AREAS.forEach(function(ar){var p=d.perms[a.id][ar.k]=d.perms[a.id][ar.k]||{};ar.acts.forEach(function(x){if(typeof p[x]!=='boolean'){p[x]=def[ar.k][x];ch=true;}});});});
  var st=staffList(d);(d.clients||[]).forEach(function(c,i){var a=adminById(d,c.assignedAdminId);if(st.length&&(!a||a.role==='super')){c.assignedAdminId=st[i%st.length].id;ch=true;}});
+ var ms=d.admins.filter(function(a){return a.role==='manager';});d.admins.forEach(function(a){if(a.role==='staff'&&ms.length&&!ms.some(function(m){return m.id===a.managerId;})){a.managerId=ms[0].id;ch=true;}if(a.role!=='staff'&&a.managerId){delete a.managerId;ch=true;}});
  if(!Array.isArray(d.logs)){d.logs=seedLogs(d);ch=true;}
+ [[MANAGER.id,36,'lm-',23],[MANAGER2.id,30,'lm2-',31],['adm-6',40,'ls6-',37],['adm-7',40,'ls7-',41]].forEach(function(x){var u=adminById(d,x[0]);if(u&&!d.logs.some(function(l){return l.actorId===x[0];})){d.logs=d.logs.concat(seedLogs(d,[u],x[1],x[2],x[3]));ch=true;}});
+ if(ch){d.logs=d.logs.sort(function(a,b){return a.at<b.at?-1:a.at>b.at?1:0;});ch=true;}
  return ch;}
 function isSuper(d,id){var a=adminById(d,id);return !!(a&&a.role==='super');}
 function can(d,id,area,act){var a=adminById(d,id);if(!a)return false;if(a.role==='super')return true;var p=d.perms&&d.perms[id]&&d.perms[id][area];return !!(p&&p[act||'view']);}
@@ -101,12 +118,12 @@ function actorNow(d){var r='';try{r=sessionStorage.getItem('isc_demo_role')||'';
 function log(d,action,area,target,detail){if(!Array.isArray(d.logs))d.logs=[];var who=actorNow(d);
  d.logs.push({id:'l-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),at:new Date().toISOString(),actorId:who.id,actor:who.name,role:who.role,action:action,area:area,target:target||'',detail:detail||''});
  if(d.logs.length>3000)d.logs=d.logs.slice(-3000);}
-function seedLogs(d){var out=[],seed=7;function rnd(){seed=(seed*16807)%2147483647;return (seed-1)/2147483646;}function pick(a){return a[Math.floor(rnd()*a.length)];}
- var admins=d.admins.length?d.admins:[SUPER_ADMIN],cl=d.clients||[],docs=d.documents||[],vs=d.visas||[],apps=d.applications||[];
- var now=Date.now(),N=140;
+function seedLogs(d,only,cnt,pre,sd){var out=[],seed=sd||7;function rnd(){seed=(seed*16807)%2147483647;return (seed-1)/2147483646;}function pick(a){return a[Math.floor(rnd()*a.length)];}
+ var admins=only||(d.admins.length?d.admins.filter(function(a){return a.role!=='manager';}):[SUPER_ADMIN]),cl=d.clients||[],docs=d.documents||[],vs=d.visas||[],apps=d.applications||[];
+ var now=Date.now(),N=cnt||140;pre=pre||'ls-';
  for(var i=0;i<N;i++){var t=new Date(now-Math.round((N-i)*(45*864e5/N)+rnd()*3600e3));var h=t.getHours();if(h<8||h>18)t.setHours(9+Math.floor(rnd()*8));
-  var a=pick(admins),r=rnd(),e={id:'ls-'+i,at:t.toISOString(),actorId:a.id,actor:adminName(a),role:ROLE_LABEL[a.role||'staff']};
-  var mine=cl.filter(function(c){return a.role==='super'||c.assignedAdminId===a.id;});var c=pick(mine.length?mine:cl);
+  var a=pick(admins),r=rnd(),e={id:pre+i,at:t.toISOString(),actorId:a.id,actor:adminName(a),role:ROLE_LABEL[a.role||'staff']};
+  var tm=teamIds(d,a.id);var mine=cl.filter(function(c){return a.role==='super'||tm.indexOf(c.assignedAdminId)>-1;});var c=pick(mine.length?mine:cl);
   if(r<.22){e.action='Login';e.area='Account';e.target=adminName(a);e.detail='Signed in';}
   else if(r<.40){var ap=apps.filter(function(x){return x.clientId===(c&&c.id);})[0]||pick(apps);e.action='Status change';e.area='Clients';e.target=clientName(c);e.detail=(ap?ap.type:'Application')+': '+pick(['New → Active','Active → Submitted','Submitted → Review','Review → Approved','Pending review → Approved','Received → Pending review']);}
   else if(r<.55){e.action='Edit';e.area='Clients';e.target=clientName(c);e.detail=pick(['Updated phone number','Updated email address','Updated contact details']);}
@@ -127,6 +144,20 @@ function visasOfType(data,type){return (data.visas||[]).map(function(v,i){return
 function effectiveDateOf(data,app){if(app.effectiveDate&&!isNaN(Date.parse(app.effectiveDate)))return app.effectiveDate;var v=visaFor(data,app);if(v&&v.effective&&!isNaN(Date.parse(v.effective)))return v.effective;return '';}
 /* Legacy migration: apps without visaId get the first visa record matching their type + its effective date.
    The legacy `due` field is KEPT only as an internal field on seeded demo apps for the owner overdue demo; new apps never get one. */
+/* Second team (Alma Armada): realistic caseload for Joshua Santos and Bea Navarro. One-time, idempotent (team2AppsV). */
+var TEAM2_APPS=[['adm-6',0,'v-uk-sv','Active',-24,'2026-12-10'],['adm-6',1,'v-de-sv','Submitted',-38,'2026-11-28'],['adm-6',0,'v-ie-sv','Approved',-70,'2026-10-05'],
+ ['adm-7',0,'v-nz-sv','New',-3,'2027-01-15'],['adm-7',1,'v-ca-sv','Review',-30,'2026-11-20'],['adm-7',0,'v-sg-sp','Active',-15,'2026-12-18'],['adm-7',1,'v-es-sv','Approved',-55,'2026-09-30']];
+function migrateTeam2Apps(d){if(d.team2AppsV>=1)return false;if(!Array.isArray(d.applications))return false;d.checklists=d.checklists||{};
+ var now=today(),added=0;
+ TEAM2_APPS.forEach(function(t,i){var id='a-t2-'+(i+1);if(d.applications.some(function(a){return a.id===id;}))return;
+  var cl=(d.clients||[]).filter(function(c){return c.assignedAdminId===t[0];});if(!cl.length)return;var c=cl[t[1]%cl.length];
+  var v=(d.visas||[]).filter(function(x){return x.id===t[2];})[0];if(!v)return;var dt=addDays(now,t[4]);
+  var a={id:id,clientId:c.id,type:v.name,visaId:v.id,effectiveDate:v.effective||'2026-01-01',status:t[3],date:dt,due:t[5],createdAt:dt,updatedAt:addDays(dt,Math.min(10,-t[4])),counselorId:COUNSELORS[(i+2)%COUNSELORS.length].id};
+  d.applications.push(a);added++;
+  var rows=ensureChecklist(d,a),n=t[3]==='New'?0:(t[3]==='Review'||t[3]==='Approved')?rows.length:Math.max(1,rows.length-1-(i%2));
+  rows.forEach(function(r,k){if(k<n){var st=t[3]==='Approved'?'approved':DOC_STATUSES[(i+k)%3];r.files=[{name:slug(r.label)+'-01.pdf',at:addDays(dt,2+k*3),status:st}];r.seq=1;r.done=true;r.status=st;r.submittedAt=addDays(dt,2+k*3);}else{r.files=[];r.seq=0;r.done=false;}});
+  if(t[3]==='Review')a.reviewFrom='Submitted';});
+ d.team2AppsV=1;return true;}
 function migrateApps(data){var changed=false;(data.applications||[]).forEach(function(a){if(!a.visaId){var v=(data.visas||[]).find(function(x){return x.name===a.type;});if(v){a.visaId=v.id;if(!a.effectiveDate&&v.effective)a.effectiveDate=v.effective;changed=true;}}});return changed;}
 function docById(data,id){return (data.documents||[]).find(function(d){return d.id===id;});}
 /* Sync an application's checklist to its visa's required docs, preserving Done/filename by docId. Mutates data.checklists. */
@@ -264,5 +295,5 @@ function migrateAll(d){var ch=false;if(migrateThreads(d))ch=true;if(migrateFiles
 function trySave(d){return save(d);}
 function progress(data,app){var visa=visaFor(data,app);if(visa){if(!visa.docIds.length)return 100;var stored={};(data.checklists[app.id]||[]).forEach(function(r){stored[r.docId]=r;});var done=visa.docIds.filter(function(id){return stored[id]&&stored[id].done;}).length;return Math.round(done/visa.docIds.length*100);}return typeof app.progress==='number'?app.progress:0;}
 function clientName(c){return [c.first,c.middle,c.last].filter(Boolean).join(' ');}
-window.ISCStore={AREAS:AREAS,ACT_LABEL:ACT_LABEL,ROLE_LABEL:ROLE_LABEL,roleDefaults:roleDefaults,staffList:staffList,isSuper:isSuper,can:can,log:log,COUNSELORS:COUNSELORS,COUNTRIES:COUNTRIES,counselorById:counselorById,visaCountry:visaCountry,fileName:fileName,syncRow:syncRow,syncReview:syncReview,FILE_STATUSES:FILE_STATUSES,stdName:stdName,extOf:extOf,clientCode:clientCode,visaCode:visaCode,docCode:docCode,KEY:KEY,OLDKEY:OLDKEY,TYPES:TYPES,STATUSES:STATUSES,CLIENT_ID:CLIENT_ID,today:today,alias:alias,load:load,save:save,reset:reset,progress:progress,clientName:clientName,visaFor:visaFor,distinctTypes:distinctTypes,visasOfType:visasOfType,effectiveDateOf:effectiveDateOf,docById:docById,ensureChecklist:ensureChecklist,docStatus:docStatus,monthKeys:monthKeys,trySave:trySave,SAMPLE_MAX:SAMPLE_MAX,DOC_STATUSES:DOC_STATUSES,slug:slug,adminById:adminById,adminName:adminName,currentAdminId:currentAdminId,esc:function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}};
+window.ISCStore={managers:managers,teamIds:teamIds,AREAS:AREAS,ACT_LABEL:ACT_LABEL,ROLE_LABEL:ROLE_LABEL,roleDefaults:roleDefaults,staffList:staffList,isSuper:isSuper,can:can,log:log,COUNSELORS:COUNSELORS,COUNTRIES:COUNTRIES,counselorById:counselorById,visaCountry:visaCountry,fileName:fileName,syncRow:syncRow,syncReview:syncReview,FILE_STATUSES:FILE_STATUSES,stdName:stdName,extOf:extOf,clientCode:clientCode,visaCode:visaCode,docCode:docCode,KEY:KEY,OLDKEY:OLDKEY,TYPES:TYPES,STATUSES:STATUSES,CLIENT_ID:CLIENT_ID,today:today,alias:alias,load:load,save:save,reset:reset,progress:progress,clientName:clientName,visaFor:visaFor,distinctTypes:distinctTypes,visasOfType:visasOfType,effectiveDateOf:effectiveDateOf,docById:docById,ensureChecklist:ensureChecklist,docStatus:docStatus,monthKeys:monthKeys,trySave:trySave,SAMPLE_MAX:SAMPLE_MAX,DOC_STATUSES:DOC_STATUSES,slug:slug,adminById:adminById,adminName:adminName,currentAdminId:currentAdminId,esc:function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}};
 })();

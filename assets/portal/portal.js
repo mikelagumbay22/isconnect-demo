@@ -11,7 +11,7 @@ var PENCIL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wi
 var TRASH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m1 0-1 14H8L7 6"/></svg>';
 /* ---- Roles & permissions (Super Admin / Staff). The nav lists only pages the signed-in user may open; a disallowed page shows a no-access notice. ---- */
 var IS_OWNER=document.body.getAttribute('data-role')==='owner',ME0=S.currentAdminId();
-var SUPER=S.isSuper(data,ME0);
+var SUPER=S.isSuper(data,ME0);var ROLE0=(S.adminById(data,ME0)||{}).role||'staff';var MGR=ROLE0==='manager';var TEAM=S.teamIds(data,ME0);
 function can(area,act){return S.can(data,ME0,area,act);}
 var NAV=[['dashboard.html','Dashboard','dashboard'],['clients.html','Clients','clients'],['documents.html','Documents','documents'],['visas.html','Case types','casetypes'],['messages.html','Messages','messages'],['logs.html','Activity logs','logs'],['permissions.html','Permissions','_super']];
 var PAGE_AREA={'owner-dashboard':'dashboard',clients:'clients',documents:'documents',visas:'casetypes',messages:'messages',logs:'logs',permissions:'_super'};
@@ -22,7 +22,7 @@ if(IS_OWNER){
  var here=location.pathname.split('/').pop()||'dashboard.html',navOk=NAV.filter(function(n){return allowed(n[2]);});
  var navEl=document.querySelector('.side nav');
  if(navEl)navEl.innerHTML=navOk.map(function(n){var m=n[0]==='messages.html';return '<a href="'+n[0]+'"'+(m?' class="nav-msg"':'')+(n[0]===here?' aria-current="page"':'')+'>'+n[1]+(m?' <span class="nav-badge" id="navMsgBadge" hidden></span>':'')+'</a>';}).join('')+'<a href="../index.html">View public site</a><a href="#" data-signout>Sign out</a>';
- var sideP=document.querySelector('.side > p');if(sideP&&!sideP.querySelector('.role-tag'))sideP.insertAdjacentHTML('beforeend','<span class="role-tag">'+esc(S.ROLE_LABEL[SUPER?'super':'staff'])+'</span>');
+ var sideP=document.querySelector('.side > p');if(sideP&&!sideP.querySelector('.role-tag'))sideP.insertAdjacentHTML('beforeend','<span class="role-tag">'+esc(S.ROLE_LABEL[ROLE0]||'Staff')+'</span>');
  var pArea=PAGE_AREA[page];
  if(pArea&&!allowed(pArea)){
   if(page==='owner-dashboard'&&navOk.length){location.replace(navOk[0][0]);}
@@ -47,19 +47,20 @@ document.querySelectorAll('[data-menu]').forEach(function(b){b.addEventListener(
 function wireReset(){var b=$('resetDemo');if(b)b.addEventListener('click',function(){data=S.reset();location.reload();});}
 /* ---- Multi-admin: every admin sees every client; 'My clients' = assignedAdminId is the signed-in admin. Choice saved per tab. ---- */
 var ME=S.currentAdminId();
-function getScope(){if(SUPER)return 'all';if(!can('clients','all'))return 'mine';return sessionStorage.getItem('isc_scope')==='all'?'all':'mine';}
-function inScope(c,sc){return (sc||getScope())==='all'||!!(c&&c.assignedAdminId===ME);}
+var BASE=MGR?'team':'mine';
+function getScope(){if(SUPER)return 'all';if(!can('clients','all'))return BASE;return sessionStorage.getItem('isc_scope')==='all'?'all':BASE;}
+function inScope(c,sc){sc=sc||getScope();if(sc==='all')return true;if(!c)return false;return sc==='team'?TEAM.indexOf(c.assignedAdminId)>-1:c.assignedAdminId===ME;}
 function adminLabel(id){var a=S.adminById(data,id);return a?S.adminName(a)+(a.id===ME?' (you)':''):'Unassigned';}
-function adminOptions(sel){return S.staffList(data).map(function(a){return '<option value="'+esc(a.id)+'"'+(a.id===sel?' selected':'')+'>'+esc(S.adminName(a))+(a.id===ME?' (you)':'')+'</option>';}).join('');}
+function adminOptions(sel){return S.staffList(data).filter(function(a){return !MGR||TEAM.indexOf(a.id)>-1||a.id===sel;}).map(function(a){return '<option value="'+esc(a.id)+'"'+(a.id===sel?' selected':'')+'>'+esc(S.adminName(a))+(a.id===ME?' (you)':'')+'</option>';}).join('');}
 function scopeToggle(el,onChange){if(!el)return;if(SUPER||!can('clients','all')){el.hidden=true;el.innerHTML='';return;}var cur=getScope();
  el.setAttribute('role','group');if(!el.getAttribute('aria-label'))el.setAttribute('aria-label','Show clients');
- el.innerHTML='<button type="button" class="seg-btn" data-scope="mine" aria-pressed="'+(cur==='mine')+'">My clients</button><button type="button" class="seg-btn" data-scope="all" aria-pressed="'+(cur==='all')+'">All clients</button>';
+ el.innerHTML='<button type="button" class="seg-btn" data-scope="'+BASE+'" aria-pressed="'+(cur===BASE)+'">'+(MGR?'My team':'My clients')+'</button><button type="button" class="seg-btn" data-scope="all" aria-pressed="'+(cur==='all')+'">All clients</button>';
  el.querySelectorAll('[data-scope]').forEach(function(b){b.addEventListener('click',function(){var v=b.getAttribute('data-scope');if(v===getScope())return;sessionStorage.setItem('isc_scope',v);
   el.querySelectorAll('[data-scope]').forEach(function(x){x.setAttribute('aria-pressed',String(x===b));});onChange(v);});});}
-window.ISCScope={get:getScope,toggle:scopeToggle,me:ME};
+window.ISCScope={get:getScope,toggle:scopeToggle,me:ME,has:function(c){return inScope(c);}};
 document.querySelectorAll('[data-admin-name]').forEach(function(el){el.textContent=S.adminName(S.adminById(data,ME));});
 function typeCountry(n){var v=(data.visas||[]).find(function(x){return x.name===n;});return S.visaCountry(v);}
-function counselorHtml(a){var c=S.counselorById(a&&a.counselorId);if(!c)return '';return '<p class="counselor"><picture><source type="image/webp" srcset="../assets/img/team/'+c.photo+'.webp?v=20261022c"><img src="../assets/img/team/'+c.photo+'.jpg?v=20261022c" width="40" height="40" alt="" decoding="async"></picture><span>Education Counselor: <strong>'+esc(c.name)+'</strong></span></p>';}
+function counselorHtml(a){var c=S.counselorById(a&&a.counselorId);if(!c)return '';return '<p class="counselor"><picture><source type="image/webp" srcset="../assets/img/team/'+c.photo+'.webp?v=20261022f"><img src="../assets/img/team/'+c.photo+'.jpg?v=20261022f" width="40" height="40" alt="" decoding="async"></picture><span>Education Counselor: <strong>'+esc(c.name)+'</strong></span></p>';}
 /* Active = still in progress (New, Active, Submitted, Review). Closed outcomes are excluded: Approved, Denied, Cancelled (withdrawn). */
 var CLOSED_STATUSES=['Approved','Denied','Cancelled','Withdrawn','Closed'];
 function isActiveApp(a){return CLOSED_STATUSES.indexOf(a.status)<0;}
@@ -81,7 +82,7 @@ if(page==='client-dashboard'){
  wireReset();
 }
 /* Empty-state block. Image: AI-generated still (Higgsfield gpt_image_2_5), disclosed in its alt text. */
-function emptyState(title,body){return '<div class="empty-state"><img src="../assets/portal/portal-empty-480.webp?v=20261022c" srcset="../assets/portal/portal-empty-240.webp?v=20261022c 240w, ../assets/portal/portal-empty-480.webp?v=20261022c 480w" sizes="200px" width="480" height="360" loading="lazy" alt="AI-generated image: an empty letter tray beside a small plant on a desk"><div><h3>'+esc(title)+'</h3><p class="muted">'+esc(body)+'</p></div></div>';}
+function emptyState(title,body){return '<div class="empty-state"><img src="../assets/portal/portal-empty-480.webp?v=20261022f" srcset="../assets/portal/portal-empty-240.webp?v=20261022f 240w, ../assets/portal/portal-empty-480.webp?v=20261022f 480w" sizes="200px" width="480" height="360" loading="lazy" alt="AI-generated image: an empty letter tray beside a small plant on a desk"><div><h3>'+esc(title)+'</h3><p class="muted">'+esc(body)+'</p></div></div>';}
 /* Owner-updates carousel: arrows, dots, swipe, Left/Right keys, optional autoplay (off by default; pauses on hover/focus; unavailable under reduced motion). */
 function initCarousel(items){var track=$('announcements'),vp=$('cViewport'),dots=$('cDots'),root=$('updates');if(!track)return;var n=items.length,i=0,timer=null,playing=false,paused=false;
  var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -110,7 +111,7 @@ if(page==='application'){
  var FL={'received':'Received','pending review':'Pending review','approved':'Approved','rejected':'Rejected'};
  function render(focusSel){ var p=S.progress(data,app); var done=cl.filter(function(x){return x.done;}).length;
   /* Header image: AI-generated still (Higgsfield gpt_image_2_5), disclosed in alt text. */
-  $('appDetail').innerHTML='<div class="app-hero"><img src="../assets/portal/portal-app-1280.webp?v=20261022c" srcset="../assets/portal/portal-app-640.webp?v=20261022c 640w, ../assets/portal/portal-app-1280.webp?v=20261022c 1280w" sizes="(max-width: 900px) 100vw, 960px" width="1280" height="300" alt="AI-generated image: a folder, a pen and a notebook on a wooden desk"></div>'
+  $('appDetail').innerHTML='<div class="app-hero"><img src="../assets/portal/portal-app-1280.webp?v=20261022f" srcset="../assets/portal/portal-app-640.webp?v=20261022f 640w, ../assets/portal/portal-app-1280.webp?v=20261022f 1280w" sizes="(max-width: 900px) 100vw, 960px" width="1280" height="300" alt="AI-generated image: a folder, a pen and a notebook on a wooden desk"></div>'
   +'<p>'+badge(app.status)+' <span class="badge">'+esc(app.type)+'</span></p><h2>'+esc(app.type)+' application</h2><p class="muted">Started '+esc(app.date)+' · Effective '+esc(S.effectiveDateOf(data,app)||'—')+'</p>'+counselorHtml(app)
   +'<div class="bar" role="progressbar" aria-valuenow="'+p+'" aria-valuemin="0" aria-valuemax="100" aria-label="Checklist progress"><i style="width:'+p+'%"></i></div><p><strong>'+p+'% complete</strong> · Checklist status: <strong>'+(p===100?'Complete':'Incomplete')+'</strong> ('+done+' of '+cl.length+' done)</p>'
   +(app.status==='Review'?'<p class="review-note">All required documents are uploaded. Your counselor is reviewing your application.</p>':'')
@@ -222,10 +223,17 @@ function mk(el,cfg){var c=new Chart(el,cfg);charts.push(c);return c;}
 function scaleSt(o){var r={};Object.keys(o).forEach(function(k){r[k]=Math.round(o[k]*share);});return r;}
 /* 'My clients': live numbers use only the admin's clients; past months are the agency history scaled by the admin's share of clients. */
 window.addEventListener('scroll',function(){$('chartTip').hidden=true;},{passive:true});
-function drawDash(){charts.forEach(function(c){c.destroy();});charts=[];SC=getScope();
- C=data.clients.filter(function(c){return inScope(c,SC);});var ids={};C.forEach(function(c){ids[c.id]=1;});
+var VIEW='';
+function viewIds(){if(!VIEW)return null;var id=VIEW.slice(2);return VIEW.charAt(0)==='m'?S.teamIds(data,id):[id];}
+function viewLabel(){if(!VIEW)return '';var a=S.adminById(data,VIEW.slice(2));return a?(VIEW.charAt(0)==='m'?S.adminName(a)+'’s team':S.adminName(a)):'';}
+function viewSetup(){var w=$('dashViewWrap'),sel=$('dashView');if(!w||!(SUPER||MGR))return;function o(v,t){return '<option value="'+esc(v)+'">'+esc(t)+'</option>';}
+ var h;if(SUPER){var ms=S.managers(data),st=data.admins.filter(function(a){return a.role==='staff';});h=o('','Whole business')+(ms.length?'<optgroup label="Managers">'+ms.map(function(m){return o('m:'+m.id,S.adminName(m)+' (team)');}).join('')+'</optgroup>':'')+(st.length?'<optgroup label="Staff">'+st.map(function(s){return o('s:'+s.id,S.adminName(s));}).join('')+'</optgroup>':'');}
+ else{h=o('','Whole team')+TEAM.filter(function(id){return id!==ME0;}).map(function(id){var a=S.adminById(data,id);return a?o('s:'+id,S.adminName(a)):'';}).join('');}
+ sel.innerHTML=h;w.hidden=false;sel.addEventListener('change',function(){VIEW=sel.value;drawDash();});}
+function drawDash(){charts.forEach(function(c){c.destroy();});charts=[];SC=getScope();var VI=viewIds();
+ C=data.clients.filter(function(c){return VI?VI.indexOf(c.assignedAdminId)>-1:inScope(c,SC);});var ids={};C.forEach(function(c){ids[c.id]=1;});
  A=data.applications.filter(function(a){return ids[a.clientId];});share=data.clients.length?C.length/data.clients.length:0;
- if($('scopeNote'))$('scopeNote').textContent=SC==='all'?'Showing all '+C.length+' clients across the team.':'Showing the '+C.length+' clients assigned to you.';
+ if($('scopeNote'))$('scopeNote').textContent=VI?'Showing the '+C.length+' clients for '+viewLabel()+'.':SC==='all'?'Showing all '+C.length+' clients across the team.':SC==='team'?'Showing the '+C.length+' clients assigned to you and your team.':'Showing the '+C.length+' clients assigned to you.';
 function awaitingApps(){return A.filter(function(a){return S.progress(data,a)<100;});}
  function byType(list){var o={};list.forEach(function(a){o[a.type]=(o[a.type]||0)+1;});return Object.keys(o).sort(function(x,y){return o[y]-o[x];}).map(function(k){return [k,o[k]];});}
  function table(cap,head,rows){return '<table class="sr-only"><caption>'+esc(cap)+'</caption><thead><tr>'+head.map(function(h){return '<th>'+esc(h)+'</th>';}).join('')+'</tr></thead><tbody>'+rows.map(function(r){return '<tr>'+r.map(function(c){return '<td>'+esc(c)+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table>';}
@@ -236,7 +244,7 @@ function awaitingApps(){return A.filter(function(a){return S.progress(data,a)<10
  var actives=A.filter(function(a){return a.status==='Active';});
  var awaiting=awaitingApps();
  /* KPI cards (revenue card = current month of the revenue chart) */
- $('kpis').innerHTML=[['Revenue · '+monLabel(keys[11]),money(curRev),'12-month total '+money(total12)],['Total clients',C.length,SC==='all'?'Month-end total, live':'Assigned to you, live'],['Active cases',actives.length,'Status: Active'],['Awaiting documents',awaiting.length,'Required documents still missing']]
+ $('kpis').innerHTML=[['Revenue · '+monLabel(keys[11]),money(curRev),'12-month total '+money(total12)],['Total clients',C.length,VI?(VIEW.charAt(0)==='m'?'Team total, live':'Assigned to this staff member, live'):SC==='all'?'Month-end total, live':SC==='team'?'You and your team, live':'Assigned to you, live'],['Active cases',actives.length,'Status: Active'],['Awaiting documents',awaiting.length,'Required documents still missing']]
   .map(function(k){return '<article class="s-card kpi"><p class="kpi-label">'+esc(k[0])+'</p><p class="kpi-value">'+esc(k[1])+'</p><p class="kpi-sub">'+esc(k[2])+'</p></article>';}).join('');
  /* ---- Charts ---- */
  function extTooltip(ctx){var el=$('chartTip');var t=ctx.tooltip;if(!t||t.opacity===0){el.hidden=true;return;}
@@ -326,25 +334,27 @@ function drawExtras(){var el=$('dashExtra');if(!el)return;var ACTIVE={New:1,Acti
  var since=Date.now()-30*864e5;
  function acts(id){return (data.logs||[]).filter(function(l){return l.actorId===id&&Date.parse(l.at)>=since;}).length;}
  function logRows(list){return list.length?list.map(function(l){return '<li><span class="act-who">'+esc(l.actor)+'</span> <span class="muted">'+esc(l.action.toLowerCase())+'</span> '+esc(l.target)+'<span class="act-when muted">'+esc(new Date(l.at).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}))+'</span></li>';}).join(''):'<li class="muted">No activity yet.</li>';}
- var logs=(data.logs||[]).slice().sort(function(a,b){return a.at<b.at?1:-1;});
- if(SUPER){
+ var VI=viewIds();var logs=(data.logs||[]).filter(function(l){return VI?VI.indexOf(l.actorId)>-1:(SUPER||!MGR||TEAM.indexOf(l.actorId)>-1);}).sort(function(a,b){return a.at<b.at?1:-1;});
+ if(SUPER||MGR){
   var ST=['New','Active','Submitted','Review','Approved','Denied','Cancelled'];
   var byS=ST.map(function(s){return [s,A.filter(function(a){return a.status===s;}).length];});
   var cs={};A.forEach(function(a){var v=S.visaFor?S.visaFor(data,a):null;var k=v?S.visaCountry(v):'—';cs[k]=(cs[k]||0)+1;});
   var byC=Object.keys(cs).map(function(k){return [k,cs[k]];}).sort(function(a,b){return b[1]-a[1];});
-  var staff=S.staffList(data).map(function(s){var cl=data.clients.filter(function(c){return c.assignedAdminId===s.id;}),ids={};cl.forEach(function(c){ids[c.id]=1;});var ap=data.applications.filter(function(a){return ids[a.clientId];});
+  function agg(list){var ids={};var cl=data.clients.filter(function(c){return list.indexOf(c.assignedAdminId)>-1;});cl.forEach(function(c){ids[c.id]=1;});var ap=data.applications.filter(function(a){return ids[a.clientId];});return [cl.length,ap.length,ap.filter(function(a){return ACTIVE[a.status];}).length,ap.filter(function(a){return a.status==='Approved';}).length,ap.filter(function(a){return S.progress(data,a)<100&&ACTIVE[a.status];}).length,list.reduce(function(n,id){return n+acts(id);},0)];}
+  var mgrTbl='';if(SUPER&&!VI){var ms=S.managers(data);if(ms.length)mgrTbl='<section class="s-card dash-sec"><div class="s-card-head"><h2>Teams by manager</h2></div><div class="s-table-wrap"><table class="s-table"><thead><tr><th>Manager</th><th class="num">Staff</th><th class="num">Clients</th><th class="num">Applications</th><th class="num">Active</th><th class="num">Approved</th><th class="num">Awaiting documents</th><th class="num">Actions (30 days)</th></tr></thead><tbody>'+ms.map(function(m){var t=S.teamIds(data,m.id);return '<tr><td><span class="cell-strong">'+esc(S.adminName(m))+'</span></td><td class="num">'+(t.length-1)+'</td>'+agg(t).map(function(v){return '<td class="num">'+v+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table></div></section>';}
+  var staff=S.staffList(data).filter(function(s){return VI?VI.indexOf(s.id)>-1:(SUPER||TEAM.indexOf(s.id)>-1);}).map(function(s){var cl=data.clients.filter(function(c){return c.assignedAdminId===s.id;}),ids={};cl.forEach(function(c){ids[c.id]=1;});var ap=data.applications.filter(function(a){return ids[a.clientId];});
    return '<tr><td><span class="cell-strong">'+esc(S.adminName(s))+'</span></td><td class="num">'+cl.length+'</td><td class="num">'+ap.length+'</td><td class="num">'+ap.filter(function(a){return ACTIVE[a.status];}).length+'</td><td class="num">'+ap.filter(function(a){return a.status==='Approved';}).length+'</td><td class="num">'+ap.filter(function(a){return S.progress(data,a)<100&&ACTIVE[a.status];}).length+'</td><td class="num">'+acts(s.id)+'</td></tr>';}).join('');
   el.innerHTML='<div class="chart-grid"><section class="s-card"><div class="s-card-head"><h2>Applications by status</h2></div>'+bars(byS)+'</section><section class="s-card"><div class="s-card-head"><h2>Applications by country</h2></div>'+bars(byC)+'</section></div>'
-   +'<section class="s-card dash-sec"><div class="s-card-head"><h2>Staff performance</h2></div><div class="s-table-wrap"><table class="s-table"><thead><tr><th>Staff member</th><th class="num">Clients</th><th class="num">Applications</th><th class="num">Active</th><th class="num">Approved</th><th class="num">Awaiting documents</th><th class="num">Actions (30 days)</th></tr></thead><tbody>'+staff+'</tbody></table></div></section>'
-   +'<section class="s-card dash-sec"><div class="sec-head"><div class="s-card-head"><h2>Recent activity</h2></div><a href="logs.html">View all activity</a></div><ul class="act-list">'+logRows(logs.slice(0,8))+'</ul></section>';
+   +mgrTbl+'<section class="s-card dash-sec"><div class="s-card-head"><h2>'+(VIEW.charAt(0)==='s'?'Performance':SUPER&&!VI?'Staff performance':'Team performance')+'</h2></div><div class="s-table-wrap"><table class="s-table"><thead><tr><th>Staff member</th><th class="num">Clients</th><th class="num">Applications</th><th class="num">Active</th><th class="num">Approved</th><th class="num">Awaiting documents</th><th class="num">Actions (30 days)</th></tr></thead><tbody>'+staff+'</tbody></table></div></section>'
+   +'<section class="s-card dash-sec"><div class="sec-head"><div class="s-card-head"><h2>'+(VIEW.charAt(0)==='s'?'Recent activity':SUPER&&!VI?'Recent activity':'Team activity')+'</h2></div>'+(can('logs','view')?'<a href="logs.html">View all activity</a>':'')+'</div><ul class="act-list">'+logRows(logs.slice(0,8))+'</ul></section>';
  }else{
   var mine=logs.filter(function(l){return l.actorId===ME0;});
   var k=[['Active applications',A.filter(function(a){return ACTIVE[a.status];}).length,'New, active, submitted or in review'],['Approved',A.filter(function(a){return a.status==='Approved';}).length,'All time, your clients'],['Submitted',A.filter(function(a){return a.status==='Submitted'||a.status==='Review';}).length,'Submitted or in review'],['Your actions',acts(ME0),'Last 30 days']];
   el.innerHTML='<h2 class="dash-h2">Your performance</h2><div class="kpi-grid">'+k.map(function(x){return '<div class="s-card kpi"><p class="kpi-label">'+x[0]+'</p><p class="kpi-value">'+x[1]+'</p><p class="kpi-sub">'+x[2]+'</p></div>';}).join('')+'</div>'
    +'<section class="s-card dash-sec"><div class="s-card-head"><h2>Your recent activity</h2></div><ul class="act-list">'+logRows(mine.slice(0,8))+'</ul></section>';
  }}
-var dh=document.querySelector('.page-head h1');if(dh)dh.textContent=SUPER?'Team dashboard':'My dashboard';
-drawDash();scopeToggle($('scopeSeg'),drawDash);
+var dh=document.querySelector('.page-head h1');if(dh)dh.textContent=SUPER||MGR?'Team dashboard':'My dashboard';
+viewSetup();drawDash();scopeToggle($('scopeSeg'),drawDash);
 }
 
 /* ================= OWNER: clients ================= */
@@ -481,14 +491,15 @@ if(page==='visas'){
 }
 if(page==='logs'){
  var LPER=25,lpg=1,ACTS=['Login','Logout','Create','Edit','Delete','Status change','Upload','Permission change'];
- var users={};(data.logs||[]).forEach(function(l){users[l.actorId]=l.actor;});
+ var LOGS=(data.logs||[]).filter(function(l){return SUPER||(MGR?TEAM.indexOf(l.actorId)>-1:l.actorId===ME0);});
+ var users={};LOGS.forEach(function(l){users[l.actorId]=l.actor;});
  $('logUser').innerHTML='<option value="">All users</option>'+Object.keys(users).sort(function(a,b){return users[a]<users[b]?-1:1;}).map(function(k){return '<option value="'+esc(k)+'">'+esc(users[k])+'</option>';}).join('');
  $('logAction').innerHTML='<option value="">All actions</option>'+ACTS.map(function(a){return '<option>'+a+'</option>';}).join('');
- var areas={};(data.logs||[]).forEach(function(l){areas[l.area]=1;});
+ var areas={};LOGS.forEach(function(l){areas[l.area]=1;});
  $('logArea').innerHTML='<option value="">All areas</option>'+Object.keys(areas).sort().map(function(a){return '<option>'+esc(a)+'</option>';}).join('');
  function dkey(iso){var d=new Date(iso);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
  function lrender(){var q=$('logQ').value.trim().toLowerCase(),u=$('logUser').value,ac=$('logAction').value,ar=$('logArea').value,fr=$('logFrom').value,to=$('logTo').value;
-  var list=(data.logs||[]).filter(function(l){var k=dkey(l.at);return (!u||l.actorId===u)&&(!ac||l.action===ac)&&(!ar||l.area===ar)&&(!fr||k>=fr)&&(!to||k<=to)&&(!q||(l.actor+' '+l.target+' '+l.detail+' '+l.action).toLowerCase().indexOf(q)>-1);}).sort(function(a,b){return a.at<b.at?1:a.at>b.at?-1:0;});
+  var list=LOGS.filter(function(l){var k=dkey(l.at);return (!u||l.actorId===u)&&(!ac||l.action===ac)&&(!ar||l.area===ar)&&(!fr||k>=fr)&&(!to||k<=to)&&(!q||(l.actor+' '+l.target+' '+l.detail+' '+l.action).toLowerCase().indexOf(q)>-1);}).sort(function(a,b){return a.at<b.at?1:a.at>b.at?-1:0;});
   var pages=Math.max(1,Math.ceil(list.length/LPER));if(lpg>pages)lpg=pages;var st=(lpg-1)*LPER;
   $('logRows').innerHTML=list.slice(st,st+LPER).map(function(l){return '<tr><td class="log-when">'+esc(new Date(l.at).toLocaleString(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}))+'</td><td><span class="cell-strong">'+esc(l.actor)+'</span><span class="muted log-role">'+esc(l.role)+'</span></td><td><span class="log-act act-'+esc(l.action.toLowerCase().replace(/\s+/g,'-'))+'">'+esc(l.action)+'</span></td><td>'+esc(l.area)+'</td><td>'+esc(l.target)+'</td><td class="muted">'+esc(l.detail)+'</td></tr>';}).join('')||'<tr><td colspan="6" class="muted">No activity matches these filters.</td></tr>';
   $('logInfo').textContent=list.length?'Showing '+(st+1)+'–'+Math.min(st+LPER,list.length)+' of '+list.length+' entries':'0 entries';
@@ -502,7 +513,12 @@ if(page==='permissions'){
  var AR={};S.AREAS.forEach(function(a){AR[a.k]=a;});
  var editU=null;
  function summary(a){if(a.role==='super')return 'Full access';var p=data.perms[a.id]||{};return Object.keys(AR).filter(function(k){return p[k]&&p[k].view;}).map(function(k){return AR[k].label;}).join(', ')||'No access';}
- function prender(){$('permRows').innerHTML=data.admins.map(function(a){return '<tr><td><span class="cell-strong">'+esc(S.adminName(a))+'</span>'+(a.id===ME0?' <span class="muted">(you)</span>':'')+'</td><td>'+esc(a.email||'')+'</td><td><span class="role-pill '+a.role+'">'+esc(S.ROLE_LABEL[a.role])+'</span></td><td class="muted">'+esc(summary(a))+'</td><td>'+data.clients.filter(function(c){return c.assignedAdminId===a.id;}).length+'</td><td class="row-acts"><button type="button" class="icon-btn" data-pedit="'+a.id+'" aria-label="Edit permissions for '+esc(S.adminName(a))+'" title="Edit permissions">'+PENCIL+'</button></td></tr>';}).join('');
+ function teamCell(a){if(a.role==='super')return 'All teams';if(a.role==='manager'){var n=S.teamIds(data,a.id).length-1;return n+' staff';}var m=S.adminById(data,a.managerId);return m?'Reports to '+S.adminName(m):'No manager';}
+ function mgrOpts(sel){return '<option value="">Select a manager…</option>'+S.managers(data).map(function(m){return '<option value="'+esc(m.id)+'"'+(m.id===sel?' selected':'')+'>'+esc(S.adminName(m))+'</option>';}).join('');}
+ function mgrErr(on){$('pMgrErr').hidden=!on;$('pManager').classList.toggle('invalid',on);$('pManager').setAttribute('aria-invalid',on?'true':'false');}
+ function syncMgr(){$('pMgrWrap').hidden=$('pRole').value!=='staff';mgrErr(false);}
+ $('pManager').addEventListener('change',function(){if($('pManager').value)mgrErr(false);});
+ function prender(){$('permRows').innerHTML=data.admins.map(function(a){return '<tr><td><span class="cell-strong">'+esc(S.adminName(a))+'</span>'+(a.id===ME0?' <span class="muted">(you)</span>':'')+'</td><td>'+esc(a.email||'')+'</td><td><span class="role-pill '+a.role+'">'+esc(S.ROLE_LABEL[a.role])+'</span></td><td class="muted">'+esc(teamCell(a))+'</td><td class="muted">'+esc(summary(a))+'</td><td>'+data.clients.filter(function(c){return c.assignedAdminId===a.id;}).length+'</td><td class="row-acts"><button type="button" class="icon-btn" data-pedit="'+a.id+'" aria-label="Edit permissions for '+esc(S.adminName(a))+'" title="Edit permissions">'+PENCIL+'</button></td></tr>';}).join('');
   document.querySelectorAll('[data-pedit]').forEach(function(b){b.addEventListener('click',function(){openU(b.getAttribute('data-pedit'),b);});});}
  function matrix(role,p){var all=[];Object.keys(AR).forEach(function(k){AR[k].acts.forEach(function(x){if(all.indexOf(x)<0)all.push(x);});});
   $('permHead').innerHTML='<tr><th>Area</th>'+all.map(function(x){return '<th class="num">'+esc(S.ACT_LABEL[x])+'</th>';}).join('')+'</tr>';
@@ -510,22 +526,25 @@ if(page==='permissions'){
   $('permNote').textContent=role==='super'?'Super Admins always have full access to every area.':'Changes apply the next time this user opens a page.';}
  function openU(id,opener){editU=id?S.adminById(data,id):null;$('permForm').reset();$('permMsg').textContent='';$('permTitle').textContent=editU?'Edit '+S.adminName(editU):'Add user';
   $('pFirst').value=editU?editU.first:'';$('pLast').value=editU?editU.last:'';$('pEmail').value=editU?editU.email||'':'';$('pRole').value=editU?editU.role:'staff';$('pRole').disabled=!!(editU&&editU.id===ME0);$('pRoleNote').hidden=!(editU&&editU.id===ME0);
-  matrix($('pRole').value,editU?data.perms[editU.id]||{}:S.roleDefaults('staff'));openModal('permModal',opener);}
- $('pRole').addEventListener('change',function(){matrix($('pRole').value,S.roleDefaults($('pRole').value));});
+  $('pManager').innerHTML=mgrOpts(editU?editU.managerId:'');syncMgr();matrix($('pRole').value,editU?data.perms[editU.id]||{}:S.roleDefaults('staff'));openModal('permModal',opener);}
+ $('pRole').addEventListener('change',function(){syncMgr();matrix($('pRole').value,S.roleDefaults($('pRole').value));});
+ document.querySelectorAll('[data-preset]').forEach(function(b){b.addEventListener('click',function(){if($('pRole').value==='super')return;matrix($('pRole').value,S.roleDefaults(b.getAttribute('data-preset')));$('permMsg').textContent=b.textContent+' preset applied. Save to keep it.';});});
  $('addUserBtn').addEventListener('click',function(){openU(null,$('addUserBtn'));});
  $('permForm').addEventListener('submit',function(e){e.preventDefault();if(!SUPER)return;var f=$('pFirst').value.trim(),l=$('pLast').value.trim(),em=$('pEmail').value.trim().toLowerCase(),role=$('pRole').value;
   if(!f||!l||!em){$('permMsg').textContent='First name, last name and email are required.';return;}
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){$('permMsg').textContent='Enter a valid email address.';$('pEmail').focus();return;}
   if(data.admins.some(function(a){return a!==editU&&String(a.email||'').toLowerCase()===em;})){$('permMsg').textContent='Another user already has this email.';return;}
+  if(editU&&editU.role==='manager'&&role!=='manager'&&S.teamIds(data,editU.id).length>1){$('permMsg').textContent='Move this manager’s staff to another manager before changing the role.';return;}
+  if(role==='staff'&&!$('pManager').value){mgrErr(true);$('permMsg').textContent='A manager is required for Staff members.';$('pManager').focus();return;}
   var p={};Object.keys(AR).forEach(function(k){p[k]={};AR[k].acts.forEach(function(x){p[k][x]=false;});});
   $('permMatrix').querySelectorAll('[data-pa]').forEach(function(c){p[c.getAttribute('data-pa')][c.getAttribute('data-px')]=c.checked;});
   if(role==='super')p=S.roleDefaults('super');
-  if(role==='staff'&&editU&&editU.role==='super'&&data.admins.filter(function(a){return a.role==='super';}).length<2){$('permMsg').textContent='At least one Super Admin is required.';return;}
-  var isNew=!editU,u=editU||{id:'adm-'+Date.now()};var before=editU?JSON.stringify({r:editU.role,p:data.perms[editU.id]}):'';
-  u.first=f;u.last=l;u.email=em;u.role=role;if(isNew)data.admins.push(u);data.perms[u.id]=p;
+  if(role!=='super'&&editU&&editU.role==='super'&&data.admins.filter(function(a){return a.role==='super';}).length<2){$('permMsg').textContent='At least one Super Admin is required.';return;}
+  var isNew=!editU,u=editU||{id:'adm-'+Date.now()};var mg=role==='staff'?($('pManager').value||''):'';var before=editU?JSON.stringify({r:editU.role,m:editU.managerId||'',p:data.perms[editU.id]}):'';var wasMgr=editU&&editU.role==='manager';
+  u.first=f;u.last=l;u.email=em;u.role=role;if(role==='staff')u.managerId=mg;else delete u.managerId;if(wasMgr&&role!=='manager')data.admins.forEach(function(a){if(a.managerId===u.id)a.managerId='';});if(isNew)data.admins.push(u);data.perms[u.id]=p;
   if(role==='super')data.clients.forEach(function(c){if(c.assignedAdminId===u.id){var sl=S.staffList(data);if(sl.length)c.assignedAdminId=sl[0].id;}});
-  var changed=!before||before!==JSON.stringify({r:u.role,p:p});
-  S.log(data,isNew?'Create':'Permission change','Permissions',S.adminName(u),isNew?'Added '+S.ROLE_LABEL[role]+' user':(changed?'Role: '+S.ROLE_LABEL[role]+'; access: '+summary(u):'Updated details'));
+  var changed=!before||before!==JSON.stringify({r:u.role,m:u.managerId||'',p:p});var mm=S.adminById(data,u.managerId);
+  S.log(data,isNew?'Create':'Permission change','Permissions',S.adminName(u),isNew?'Added '+S.ROLE_LABEL[role]+' user':(changed?'Role: '+S.ROLE_LABEL[role]+(role==='staff'?'; manager: '+(mm?S.adminName(mm):'none'):'')+'; access: '+summary(u):'Updated details'));
   S.save(data);closeModal('permModal');prender();$('permStatus').textContent=(isNew?'Added ':'Saved ')+S.adminName(u)+'.';});
  prender();
 }

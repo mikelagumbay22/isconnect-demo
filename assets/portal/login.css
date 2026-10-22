@@ -1,5 +1,5 @@
-@font-face{font-family:"Fraunces";src:url("../fonts/fraunces-var-latin.woff2?v=20261022c") format("woff2");font-weight:300 700;font-display:optional}
-@font-face{font-family:"Jakarta";src:url("../fonts/jakarta-var-latin.woff2?v=20261022c") format("woff2");font-weight:300 800;font-display:optional}
+@font-face{font-family:"Fraunces";src:url("../fonts/fraunces-var-latin.woff2?v=20261022f") format("woff2");font-weight:300 700;font-display:optional}
+@font-face{font-family:"Jakarta";src:url("../fonts/jakarta-var-latin.woff2?v=20261022f") format("woff2");font-weight:300 800;font-display:optional}
 *{box-sizing:border-box}html,body{margin:0}
 body.login-page{font-family:Jakarta,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#0b1626;background:#faf7f1;-webkit-font-smoothing:antialiased}
 a{color:#2a609b}a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #4482c1;outline-offset:2px}

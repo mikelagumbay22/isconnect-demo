@@ -48,7 +48,7 @@ if(role==='owner'){
   var cur=new URLSearchParams(location.search).get('c')||null;
   function cRec(d,id){return (d.clients||[]).find(function(c){return c.id===id;});}
   function appOf(d,id){return (d.applications||[]).filter(function(x){return x.clientId===id;})[0];}
-  function scopeOk(c){return !window.ISCScope||window.ISCScope.get()==='all'||(c&&c.assignedAdminId===ME);}
+  function scopeOk(c){if(window.ISCScope&&window.ISCScope.has)return window.ISCScope.has(c);return !window.ISCScope||window.ISCScope.get()==='all'||(c&&c.assignedAdminId===ME);}
   function renderList(){var d=fresh(),term=(q.value||'').trim().toLowerCase();
    var ids=Object.keys(d.threads||{}).filter(function(id){return cRec(d,id)&&d.threads[id].messages.length&&scopeOk(cRec(d,id));});
    /* a picked client with no messages yet is shown (unsaved) at the top until the first message is sent */
