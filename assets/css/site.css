@@ -148,7 +148,9 @@ html.lock,html.lock body{overflow:hidden}
 .hero-media video.is-playing{opacity:1}
 .hero-media img{transform:scale(1.06);animation:settle 2.4s var(--ease-out) forwards}
 @keyframes settle{to{transform:scale(1)}}
-.hero::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(7,15,27,.5) 0%,rgba(7,15,27,.14) 34%,rgba(7,15,27,.5) 64%,rgba(7,15,27,.92) 100%),linear-gradient(90deg,rgba(7,15,27,.55),rgba(7,15,27,0) 70%)}
+.hero::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(7,15,27,.34) 0%,rgba(7,15,27,0) 20%,rgba(7,15,27,0) 48%,rgba(7,15,27,.5) 100%),linear-gradient(90deg,rgba(7,15,27,.52) 0%,rgba(7,15,27,.22) 42%,rgba(7,15,27,0) 66%)}
+.hero h1,.hero .lead,.hero .eyebrow{text-shadow:0 1px 18px rgba(7,15,27,.45)}
+@media(max-width:1079px){.hero::after{background:linear-gradient(180deg,rgba(7,15,27,.34) 0%,rgba(7,15,27,.2) 14%,rgba(7,15,27,.46) 30%,rgba(7,15,27,.42) 70%,rgba(7,15,27,.62) 100%)}}
 .hero-in{width:100%;padding-top:calc(var(--hdr) + 60px);padding-bottom:clamp(36px,5vw,56px)}
 .hero h1{max-width:13ch;margin-bottom:.35em;color:#fff}
 .hero h1 .ln{display:block;overflow:hidden;padding-bottom:.06em;margin-bottom:-.06em}
@@ -166,12 +168,7 @@ html.lock,html.lock body{overflow:hidden}
 .stat+.stat{border-left:1px solid rgba(255,255,255,.16)}
 .stat b{display:block;font:400 clamp(1.9rem,3.4vw,2.9rem)/1 var(--serif);letter-spacing:-.02em;color:#fff;font-variant-numeric:tabular-nums}
 .stat span{display:block;margin-top:8px;font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.72)}
-.scroll-cue{display:none;align-items:center;gap:12px;margin-top:34px;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.7);text-decoration:none}
-.scroll-cue i{position:relative;width:1px;height:44px;background:rgba(255,255,255,.25);overflow:hidden}
-.scroll-cue i::after{content:"";position:absolute;left:0;top:-50%;width:1px;height:50%;background:#fff;animation:cue 2.2s var(--ease) infinite}
-@keyframes cue{to{top:110%}}
-@media(min-width:1080px){.scroll-cue{display:inline-flex}}
-/* ---------- inner page banner (uniform height) ---------- */
+@media(min-width:1080px){/* ---------- inner page banner (uniform height) ---------- */
 .page-hero{position:relative;min-height:clamp(500px,70vh,660px);padding-top:112px;display:flex;align-items:flex-end;color:#fff;overflow:hidden;background:var(--night);isolation:isolate}
 .page-hero .ph-media{position:absolute;inset:0;z-index:-2}
 .page-hero .ph-media img{width:100%;height:100%;object-fit:cover;transform:scale(1.08);animation:settle 2.2s var(--ease-out) forwards}
