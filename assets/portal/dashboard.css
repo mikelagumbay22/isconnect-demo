@@ -330,3 +330,6 @@ body.shad .badge.st-approved::before{background:#16a34a}body.shad .badge.st-deni
 /* v20261022r */
 .client-since{margin:2px 0 0;font-size:.85rem}
 td.nowrap{white-space:nowrap}
+/* v20261022s */
+.app-break{display:flex;flex-direction:column;gap:2px;white-space:nowrap;font-size:.85rem;line-height:1.35}
+.app-n{font-weight:600;color:#0b1626}.app-n.done{font-weight:500;color:#71717a}
